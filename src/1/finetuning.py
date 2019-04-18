@@ -50,7 +50,7 @@ parser.add_argument("--momentum", dest="MOMENTUM", help="momentum for optimizers
                     type=float, default=0.9)
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(data_loaders, model, criterion, optimizer, scheduler, num_epochs=25):
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc_train = 0.0
     best_acc_val = 0.0
@@ -60,140 +60,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
         logger.info('Epoch {}/{}'.format(epoch, num_epochs - 1))
         logger.info('-' * 10)
 
-        # Each epoch has a training and validation phase
-        for phase in ['train', 'val']:
-            if phase == 'train':
-                scheduler.step()
-                model.train(True)  # Set model to training mode
-            else:
-                model.train(False)  # Set model to evaluate mode
-            running_loss = 0.0
-            running_corrects = 0
-            running_corrects_preterm = 0
-            preterm_size = 0
-            if torch.__version__ == '0.3.1b0+4cf3225':
-                confusion_matrix = torch.zeros(2, 2)
-            else:
-                confusion_matrix = torch.zeros([2, 2], dtype=torch.int32)
 
-            # Iterate over data.
-            for data in data_loaders[phase]:
-                # get the inputs
-                inputs, labels = data
-
-                # wrap them in Variable
-                if torch.__version__ == '0.3.1b0+4cf3225':
-                    if use_gpu:
-                        inputs = Variable(inputs.cuda())
-                        labels = Variable(labels.cuda())
-                    else:
-                        inputs, labels = Variable(inputs), Variable(labels)
-                else:
-                    inputs = inputs.to(device)
-                    labels = labels.to(device)
-                # if use_gpu:
-                #     inputs = Variable(inputs.cuda())
-                #     labels = Variable(labels.cuda())
-                # else:
-                #     inputs, labels = Variable(inputs), Variable(labels)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward
-                if phase == 'train':
-                    # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
-                    outputs, aux_outputs = model(inputs)
-                    _, preds = torch.max(outputs.data, 1)
-                    loss1 = criterion(outputs, labels)
-                    loss2 = criterion(aux_outputs, labels)
-                    loss = loss1 + 0.4 * loss2
-                else:
-                    outputs = model(inputs)
-                    _, preds = torch.max(outputs.data, 1)
-                    loss = criterion(outputs, labels)
-
-                # backward + optimize only if in training phase
-                if phase == 'train':
-                    loss.backward()
-                    optimizer.step()
-
-                # statistics
-                if torch.__version__ == '0.3.1b0+4cf3225':
-                    running_loss += float(loss.data[0]) * float(inputs.size(0))
-                    # print(float(loss.data[0]), float(inputs.size(0)),
-                    #       float(float(loss.data[0]) * float(inputs.size(0))), running_loss)
-                else:
-                    running_loss += float(loss.item()) * float(inputs.size(0))
-                    # print(loss, loss.item(), inputs.size(0))
-                running_corrects += torch.sum(preds == labels.data)
-
-                for b_idx in range(args.BATCH_SIZE):
-                    if int(labels.data[b_idx]) == 1:
-                        preterm_size += 1
-                        if int(preds[b_idx]) == 1:
-                            running_corrects_preterm += 1
-                    if int(preds[b_idx]) == 0 or int(preds[b_idx]) == 1:
-                        confusion_matrix[int(labels.data[b_idx])][int(preds[b_idx])] += 1
-                    # if int(labels.data[b_idx]) == 1 and not is_inception:
-                    #     logger.info('Prediction: {}, outputs: {:.2f}, {:.2f}'.format(int(preds[b_idx]),
-                    #                                                                float(outputs[b_idx][0]),
-                    #                                                                float(outputs[b_idx][1])))
-                    # elif int(labels.data[b_idx]) == 1:
-                    #     logger.info('Prediction: {}, outputs main: {:.2f}, {:.2f}\t'
-                    #                 '   aux: {:.2f}, {:.2f}'.format(int(preds[b_idx]),
-                    #                                             float(outputs[b_idx][0]),
-                    #                                             float(outputs[b_idx][1]),
-                    #                                             float(aux_outputs[b_idx][0]),
-                    #                                             float(aux_outputs[b_idx][1])))
-
-            epoch_loss = running_loss / datasets_len[phase]
-            epoch_acc = int(running_corrects) / datasets_len[phase]
-            epoch_acc_preterm = int(running_corrects_preterm) / preterm_size
-
-            logger.info('{} Loss: {:.4f} Acc: {:.4f}, Preterm_Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc,
-                                                                                  epoch_acc_preterm))
-            logger.info('\n' + str(confusion_matrix))
-            if phase == 'train':
-                writer.add_scalar('Train/Loss', epoch_loss, epoch)
-                writer.add_scalar('Train/Accuracy', epoch_acc, epoch)
-            elif phase == 'val':
-                writer.add_scalar('Test/Loss', epoch_loss, epoch)
-                writer.add_scalar('Test/Accuracy', epoch_acc, epoch)
-
-            # # deep copy and save the model with best accuracy
-            # if phase == 'val' and epoch_acc >= best_acc_val:
-            #     best_acc_val = epoch_acc
-            #     torch.save(model.state_dict(), MODEL_FILENAME + '_test')
-            #     logger.info('[test] Model with best accuracy overall saved.')
-            #
-            # # deep copy and save the model with best preterm accuracy
-            # if phase == 'val' and epoch_acc_preterm >= best_acc_preterm_val:
-            #     best_acc_preterm_val = epoch_acc_preterm
-            #     torch.save(model.state_dict(), MODEL_FILENAME + '_test_preterm')
-            #     logger.info('[test] Model with best accuracy in preterm saved.')
-            # # deep copy and save the model with best accuracy
-            # if phase == 'train' and epoch_acc >= best_acc_train:
-            #     best_acc_train = epoch_acc
-            #     torch.save(model.state_dict(), MODEL_FILENAME + '_train')
-            #     logger.info('[train] Model with best accuracy overall saved.')
-            #
-            # # deep copy and save the model with best preterm accuracy
-            # if phase == 'train' and epoch_acc_preterm >= best_acc_preterm_train:
-            #     best_acc_preterm_train = epoch_acc_preterm
-            #     torch.save(model.state_dict(), MODEL_FILENAME + '_train_preterm')
-            #     logger.info('[train] Model with best accuracy in preterm saved.')
-
-        logger.info('\n')
-
-    # time_elapsed = time.time() - since
-    # logger.info('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-    logger.info('Best val Acc val: {:4f}'.format(best_acc_val))
-    logger.info('Best val Acc train: {:4f}'.format(best_acc_train))
-
-    # load best model weights
-    model.load_state_dict(best_model_wts)
-    return model
 
 
 if __name__ == "__main__":
@@ -289,6 +156,8 @@ if __name__ == "__main__":
     dataset_train.dataset.trasform = data_transforms['train']
     dataset_val.dataset.trasform = data_transforms['val']
     dataset_test.dataset.trasform = data_transforms['val']
+
+    print(len(dataset_train), len(dataset_val), len(dataset_test))
 
     train_dataloader = DataLoader(dataset_train, batch_size=args.BATCH_SIZE, shuffle=True)
     val_dataloader = DataLoader(dataset_val, batch_size=args.BATCH_SIZE, shuffle=True)
