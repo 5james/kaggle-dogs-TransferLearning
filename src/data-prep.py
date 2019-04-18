@@ -1,11 +1,24 @@
 import os
 from PIL import Image
+import kaggle
+import tarfile
 import xml.etree.ElementTree as ET
 
 DOWNLOAD_DIR = '../download/'
 DATA_DIR = '../data/'
 
 if __name__ == "__main__":
+    if not os.path.isdir(DOWNLOAD_DIR):
+        os.mkdir(DOWNLOAD_DIR)
+        kaggle.api.authenticate()
+        kaggle.api.dataset_download_files('jessicali9530/stanford-dogs-dataset', path=DOWNLOAD_DIR, unzip=True)
+        tar = tarfile.open('images.tar', "r:")
+        tar.extractall()
+        tar.close()
+        tar = tarfile.open('annotations.tar', "r:")
+        tar.extractall()
+        tar.close()
+
     if not os.path.isdir(DATA_DIR):
         os.mkdir(DATA_DIR)
     for breed in os.listdir(DOWNLOAD_DIR + 'Annotation/'):
