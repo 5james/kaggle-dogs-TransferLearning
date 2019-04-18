@@ -16,7 +16,7 @@ if __name__ == "__main__":
         tar = tarfile.open(DOWNLOAD_DIR + 'images.tar', "r:")
         tar.extractall(path=DOWNLOAD_DIR)
         tar.close()
-        tar = tarfile.open(DOWNLOAD_DIR +'annotations.tar', "r:")
+        tar = tarfile.open(DOWNLOAD_DIR + 'annotations.tar', "r:")
         tar.extractall(path=DOWNLOAD_DIR)
         tar.close()
 

@@ -282,17 +282,17 @@ if __name__ == "__main__":
     dataset_all_len = int(len(dataset_all))
     datasets_len = {'train': int(dataset_all_len * TRAIN_PART), 'val': int(dataset_all_len - VALIDATION_PART)}
     datasets_len['test'] = int(dataset_all_len - datasets_len['train'] - datasets_len['val'])
-    dataset_train, dataset_val, dataset_data = random_split(dataset_all,
+    dataset_train, dataset_val, dataset_test = random_split(dataset_all,
                                                             [datasets_len['train'],
                                                              datasets_len['val'],
                                                              datasets_len['test']])
     dataset_train.trasform = data_transforms['train']
     dataset_val.trasform = data_transforms['val']
-    dataset_data.trasform = data_transforms['val']
+    dataset_test.trasform = data_transforms['test']
 
     train_dataloader = DataLoader(dataset_train, batch_size=args.BATCH_SIZE, shuffle=True)
     val_dataloader = DataLoader(dataset_val, batch_size=args.BATCH_SIZE, shuffle=True)
-    test_dataloader = DataLoader(dataset_data, batch_size=args.BATCH_SIZE, shuffle=True)
+    test_dataloader = DataLoader(dataset_test, batch_size=args.BATCH_SIZE, shuffle=True)
 
     data_loaders = {'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader}
 
