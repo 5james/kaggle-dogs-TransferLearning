@@ -10,6 +10,7 @@ DATA_DIR = '../data/'
 if __name__ == "__main__":
     if not os.path.isdir(DOWNLOAD_DIR):
         os.mkdir(DOWNLOAD_DIR)
+    if not (os.path.isdir(DOWNLOAD_DIR + 'Annotation') and not os.path.isdir(DOWNLOAD_DIR + 'Images')):
         kaggle.api.authenticate()
         kaggle.api.dataset_download_files('jessicali9530/stanford-dogs-dataset', path=DOWNLOAD_DIR, unzip=True)
         tar = tarfile.open('images.tar', "r:")
