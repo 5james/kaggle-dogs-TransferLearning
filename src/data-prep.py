@@ -13,11 +13,11 @@ if __name__ == "__main__":
     if not (os.path.isdir(DOWNLOAD_DIR + 'Annotation') and not os.path.isdir(DOWNLOAD_DIR + 'Images')):
         kaggle.api.authenticate()
         kaggle.api.dataset_download_files('jessicali9530/stanford-dogs-dataset', path=DOWNLOAD_DIR, unzip=True)
-        tar = tarfile.open('images.tar', "r:")
-        tar.extractall()
+        tar = tarfile.open(DOWNLOAD_DIR + 'images.tar', "r:")
+        tar.extractall(path=DOWNLOAD_DIR)
         tar.close()
-        tar = tarfile.open('annotations.tar', "r:")
-        tar.extractall()
+        tar = tarfile.open(DOWNLOAD_DIR +'annotations.tar', "r:")
+        tar.extractall(path=DOWNLOAD_DIR)
         tar.close()
 
     if not os.path.isdir(DATA_DIR):
