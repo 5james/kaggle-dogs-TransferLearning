@@ -280,7 +280,7 @@ if __name__ == "__main__":
     # prepare datasets for training, validating and testing with DataLoaders
     dataset_all = datasets.ImageFolder(root=os.path.abspath('../../data').replace('\\', '/'))
     dataset_all_len = int(len(dataset_all))
-    datasets_len = {'train': int(dataset_all_len * TRAIN_PART), 'val': int(dataset_all_len - VALIDATION_PART)}
+    datasets_len = {'train': int(dataset_all_len * TRAIN_PART), 'val': int(dataset_all_len * VALIDATION_PART)}
     datasets_len['test'] = int(dataset_all_len - datasets_len['train'] - datasets_len['val'])
     dataset_train, dataset_val, dataset_test = random_split(dataset_all,
                                                             [datasets_len['train'],
