@@ -112,6 +112,15 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             epoch_loss = running_loss / datasets_len[phase]
             epoch_acc = running_corrects / datasets_len[phase]
 
+            logger.info('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+
+            if phase == 'train':
+                writer.add_scalar('Train/Loss', epoch_loss, epoch)
+                writer.add_scalar('Train/Accuracy', epoch_acc, epoch)
+            elif phase == 'val':
+                writer.add_scalar('Val/Loss', epoch_loss, epoch)
+                writer.add_scalar('Val/Accuracy', epoch_acc, epoch)
+
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
 
