@@ -53,6 +53,7 @@ parser.add_argument("--momentum", dest="MOMENTUM", help="momentum for optimizers
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
+    best_acc = 0.0
 
     for epoch in range(num_epochs):
         logger.info('-' * 60)
