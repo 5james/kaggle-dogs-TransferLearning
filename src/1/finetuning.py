@@ -153,11 +153,9 @@ if __name__ == "__main__":
                                                             [datasets_len['train'],
                                                              datasets_len['val'],
                                                              datasets_len['test']])
-    dataset_train.dataset.trasform = data_transforms['train']
-    dataset_val.dataset.trasform = data_transforms['val']
-    dataset_test.dataset.trasform = data_transforms['val']
-
-    print(len(dataset_train), len(dataset_val), len(dataset_test))
+    dataset_train.dataset.transform = data_transforms['train']
+    dataset_val.dataset.transform = data_transforms['val']
+    dataset_test.dataset.transform = data_transforms['val']
 
     train_dataloader = DataLoader(dataset_train, batch_size=args.BATCH_SIZE, shuffle=True)
     val_dataloader = DataLoader(dataset_val, batch_size=args.BATCH_SIZE, shuffle=True)
