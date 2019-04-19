@@ -50,17 +50,80 @@ parser.add_argument("--momentum", dest="MOMENTUM", help="momentum for optimizers
                     type=float, default=0.9)
 
 
-def train_model(data_loaders, model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+    since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
-    best_acc_train = 0.0
-    best_acc_val = 0.0
 
     for epoch in range(num_epochs):
         logger.info('-' * 60)
         logger.info('Epoch {}/{}'.format(epoch, num_epochs - 1))
         logger.info('-' * 10)
 
+        # Each epoch has a training and validation phase
+        for phase in ['train', 'val']:
+            if phase == 'train':
+                scheduler.step()
+                model.train(True)  # Set model to training mode
+            else:
+                model.train(False)  # Set model to evaluate mode
 
+            running_loss = 0.0
+            running_corrects = 0
+
+            # Iterate over data.
+            for data in data_loaders[phase]:
+                # get the inputs
+                inputs, labels = data
+
+                # wrap them in Variable
+                if torch.__version__ == '0.3.1b0+4cf3225':
+                    if use_gpu:
+                        inputs = Variable(inputs.cuda())
+                        labels = Variable(labels.cuda())
+                    else:
+                        inputs, labels = Variable(inputs), Variable(labels)
+                else:
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+
+                # zero the parameter gradients
+                optimizer.zero_grad()
+
+                # forward
+                outputs = model(inputs)
+                _, preds = torch.max(outputs.data, 1)
+                loss = criterion(outputs, labels)
+
+                # backward + optimize only if in training phase
+                if phase == 'train':
+                    loss.backward()
+                    optimizer.step()
+
+                # statistics
+                running_loss += loss.data[0] * inputs.size(0)
+                running_corrects += torch.sum(preds == labels.data)
+
+            epoch_loss = running_loss / datasets_len[phase]
+            epoch_acc = running_corrects / datasets_len[phase]
+
+            print('{} Loss: {:.4f} Acc: {:.4f}'.format(
+                phase, epoch_loss, epoch_acc))
+
+            # deep copy the model
+            if phase == 'val' and epoch_acc > best_acc:
+                best_acc = epoch_acc
+                best_model_wts = copy.deepcopy(model.state_dict())
+
+        print()
+
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(
+        time_elapsed // 60, time_elapsed % 60))
+    print('Best val Acc: {:4f}'.format(best_acc))
+
+    # load best model weights
+    model.load_state_dict(best_model_wts)
+    return model
 
 
 if __name__ == "__main__":
