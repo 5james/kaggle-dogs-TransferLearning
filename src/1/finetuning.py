@@ -31,17 +31,15 @@ VALIDATION_PART = 0.1
 # TEST_PART = 0.1
 
 parser = ArgumentParser(formatter_class=RawTextHelpFormatter)
-parser.add_argument("-s", "--split", dest="SPLIT", help="split between amount of training and testing images",
-                    type=float, default=0.85)
 parser.add_argument("-mf", "--model_filename", dest="MODEL_FILENAME",
                     help="name (path) to model of CNN to be saved",
                     type=str, default="model")
 parser.add_argument("--batch_size", dest="BATCH_SIZE", help="DataLoader batch size",
-                    type=int, default=64)
+                    type=int, default=32)
 parser.add_argument("--num_workers", dest="NUM_WORKERS", help="DataLoader number of workers",
                     type=int, default=0)
 parser.add_argument("--epochs", dest="EPOCHS", help="number of epochs",
-                    type=int, default=100)
+                    type=int, default=30)
 parser.add_argument("--learning_rate", dest="LEARNING_RATE", help="learning rate",
                     type=float, default=0.001)
 parser.add_argument("--weight_decay", dest="WEIGHT_DECAY", help="weight decay (L2)",
@@ -110,7 +108,9 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 running_corrects += torch.sum(preds == labels.data)
 
             epoch_loss = running_loss / datasets_len[phase]
-            epoch_acc = running_corrects / datasets_len[phase]
+            logger.info('running_loss = ' + str(running_loss))
+            epoch_acc = int(running_corrects) / datasets_len[phase]
+            logger.info('running_corrects = ' + str(int(running_corrects)))
 
             logger.info('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
 
@@ -121,20 +121,16 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 writer.add_scalar('Val/Loss', epoch_loss, epoch)
                 writer.add_scalar('Val/Accuracy', epoch_acc, epoch)
 
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(
-                phase, epoch_loss, epoch_acc))
-
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
 
-        print()
+                logger.info()
 
     time_elapsed = time.time() - since
-    print('Training complete in {:.0f}m {:.0f}s'.format(
-        time_elapsed // 60, time_elapsed % 60))
-    print('Best val Acc: {:4f}'.format(best_acc))
+    logger.info('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+    logger.info('Best val Acc: {:4f}'.format(best_acc))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
@@ -189,6 +185,10 @@ if __name__ == "__main__":
 
     # create model
     model_ft = models.vgg16(pretrained=True)
+    # freeze all layers
+    for para in model_ft.parameters():
+        para.requires_grad = False
+    # newly created layers have requires_grad == True
     model_ft.classifier = nn.Sequential(
         nn.Dropout(p=0.5),
         nn.Linear(512 * 7 * 7, 4096, bias=True),
@@ -198,11 +198,6 @@ if __name__ == "__main__":
         nn.ReLU(inplace=True),
         nn.Linear(4096, NUM_CLASSES)
     )
-
-    # freeze all fully-connected layers
-    for para in model_ft.classifier.parameters():
-        para.requires_grad = False
-    # freeze_params(model_ft.parameters())
 
     # normalization
     data_transforms = {
