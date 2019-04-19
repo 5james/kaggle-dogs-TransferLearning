@@ -100,7 +100,12 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                     optimizer.step()
 
                 # statistics
-                running_loss += loss.data[0] * inputs.size(0)
+                if torch.__version__ == '0.3.1b0+4cf3225':
+                    running_loss += float(loss.data[0]) * float(inputs.size(0))
+                    # print(float(loss.data[0]), float(inputs.size(0)),
+                    #       float(float(loss.data[0]) * float(inputs.size(0))), running_loss)
+                else:
+                    running_loss += float(loss.item()) * float(inputs.size(0))
                 running_corrects += torch.sum(preds == labels.data)
 
             epoch_loss = running_loss / datasets_len[phase]
