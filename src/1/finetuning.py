@@ -105,26 +105,27 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                     #       float(float(loss.data[0]) * float(inputs.size(0))), running_loss)
                 else:
                     running_loss += float(loss.item()) * float(inputs.size(0))
-                running_corrects_top1 += torch.sum(preds == labels.data)
+                # running_corrects_top1 += torch.sum(preds == labels.data)
                 top1, top5 = correct_count(outputs, labels, topk=(1, 5))
-                print('top1:' + str(top1))
-                print('top5:' + str(top5))
+                running_corrects_top1 += int(top1)
+                running_corrects_top5 += int(top5)
 
-
-
+            logger.info('{}'.format(phase))
             epoch_loss = running_loss / datasets_len[phase]
             logger.info('Epoch Loss = {:6.4f}'.format(running_loss))
             epoch_acc_top1 = int(running_corrects_top1) / datasets_len[phase]
             logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(epoch_acc_top1))
-
-            logger.info('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc_top1))
+            epoch_acc_top5 = int(running_corrects_top5) / datasets_len[phase]
+            logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(epoch_acc_top5))
 
             if phase == 'train':
                 writer.add_scalar('Train/Loss', epoch_loss, epoch)
-                writer.add_scalar('Train/Accuracy', epoch_acc_top1, epoch)
+                writer.add_scalar('Train/Accuracy-top1', epoch_acc_top1, epoch)
+                writer.add_scalar('Train/Accuracy-top5', epoch_acc_top5, epoch)
             elif phase == 'val':
                 writer.add_scalar('Val/Loss', epoch_loss, epoch)
-                writer.add_scalar('Val/Accuracy', epoch_acc_top1, epoch)
+                writer.add_scalar('Val/Accuracy-top1', epoch_acc_top1, epoch)
+                writer.add_scalar('Val/Accuracy-top5', epoch_acc_top5, epoch)
 
             # deep copy the model
             if phase == 'val' and epoch_acc_top1 > best_acc:
