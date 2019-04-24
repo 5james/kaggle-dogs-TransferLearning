@@ -12,10 +12,14 @@ from torch.optim import lr_scheduler
 import numpy as np
 from torchvision import datasets, models, transforms
 from tensorboardX import SummaryWriter
+import sys
+sys.path.append("..")
 from eval import *
 import copy
 import pickle
 import re
+
+
 
 DATA_DIR = '../data/'
 LOG_DIR = 'logs/'
@@ -116,7 +120,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             epoch_acc_top1 = int(running_corrects_top1) / datasets_len[phase]
             logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(epoch_acc_top1))
             epoch_acc_top5 = int(running_corrects_top5) / datasets_len[phase]
-            logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(epoch_acc_top5))
+            logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(epoch_acc_top5))
 
             if phase == 'train':
                 writer.add_scalar('Train/Loss', epoch_loss, epoch)

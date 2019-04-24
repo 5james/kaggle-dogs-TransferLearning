@@ -2,3 +2,5 @@ data
 download
 .idea
 logs
+__pycache__
+
