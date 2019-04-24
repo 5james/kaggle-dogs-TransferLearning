@@ -12,6 +12,7 @@ from torch.optim import lr_scheduler
 import numpy as np
 from torchvision import datasets, models, transforms
 from tensorboardX import SummaryWriter
+from eval import *
 import copy
 import pickle
 import re
@@ -31,9 +32,6 @@ VALIDATION_PART = 0.1
 # TEST_PART = 0.1
 
 parser = ArgumentParser(formatter_class=RawTextHelpFormatter)
-parser.add_argument("-mf", "--model_filename", dest="MODEL_FILENAME",
-                    help="name (path) to model of CNN to be saved",
-                    type=str, default="model")
 parser.add_argument("--batch_size", dest="BATCH_SIZE", help="DataLoader batch size",
                     type=int, default=32)
 parser.add_argument("--num_workers", dest="NUM_WORKERS", help="DataLoader number of workers",
@@ -46,6 +44,7 @@ parser.add_argument("--weight_decay", dest="WEIGHT_DECAY", help="weight decay (L
                     type=float, default=0)
 parser.add_argument("--momentum", dest="MOMENTUM", help="momentum for optimizers",
                     type=float, default=0.9)
+parser.add_argument("--nogpu", dest="NOGPU", help="Indicates not to use GPU", action='store_true', default=False)
 
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
@@ -67,7 +66,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 model.train(False)  # Set model to evaluate mode
 
             running_loss = 0.0
-            running_corrects = 0
+            running_corrects_top1 = 0
+            running_corrects_top5 = 0
 
             # Iterate over data.
             for data in data_loaders[phase]:
@@ -90,7 +90,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
                 # forward
                 outputs = model(inputs)
-                _, preds = torch.max(outputs.data, 1)
+                xxx, preds = torch.max(outputs.data, 1)
                 loss = criterion(outputs, labels)
 
                 # backward + optimize only if in training phase
@@ -105,25 +105,30 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                     #       float(float(loss.data[0]) * float(inputs.size(0))), running_loss)
                 else:
                     running_loss += float(loss.item()) * float(inputs.size(0))
-                running_corrects += torch.sum(preds == labels.data)
+                running_corrects_top1 += torch.sum(preds == labels.data)
+                top1, top5 = correct_count(outputs, labels, topk=(1, 5))
+                print('top1:' + str(top1))
+                print('top5:' + str(top5))
+
+
 
             epoch_loss = running_loss / datasets_len[phase]
-            logger.info('running_loss = ' + str(running_loss))
-            epoch_acc = int(running_corrects) / datasets_len[phase]
-            logger.info('running_corrects = ' + str(int(running_corrects)))
+            logger.info('Epoch Loss = {:6.4f}'.format(running_loss))
+            epoch_acc_top1 = int(running_corrects_top1) / datasets_len[phase]
+            logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(epoch_acc_top1))
 
-            logger.info('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+            logger.info('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc_top1))
 
             if phase == 'train':
                 writer.add_scalar('Train/Loss', epoch_loss, epoch)
-                writer.add_scalar('Train/Accuracy', epoch_acc, epoch)
+                writer.add_scalar('Train/Accuracy', epoch_acc_top1, epoch)
             elif phase == 'val':
                 writer.add_scalar('Val/Loss', epoch_loss, epoch)
-                writer.add_scalar('Val/Accuracy', epoch_acc, epoch)
+                writer.add_scalar('Val/Accuracy', epoch_acc_top1, epoch)
 
             # deep copy the model
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
+            if phase == 'val' and epoch_acc_top1 > best_acc:
+                best_acc = epoch_acc_top1
                 best_model_wts = copy.deepcopy(model.state_dict())
 
     time_elapsed = time.time() - since
@@ -236,11 +241,11 @@ if __name__ == "__main__":
 
     # check if can use GPU
     if torch.__version__ == '0.3.1b0+4cf3225':
-        use_gpu = torch.cuda.is_available()
+        use_gpu = torch.cuda.is_available() and not args.NOGPU
         if use_gpu:
             model_ft = model_ft.cuda()
     else:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() and not args.NOGPU else "cpu")
         model_ft = model_ft.to(device)
 
     criterion = nn.CrossEntropyLoss()

@@ -31,11 +31,6 @@ VALIDATION_PART = 0.1
 # TEST_PART = 0.1
 
 parser = ArgumentParser(formatter_class=RawTextHelpFormatter)
-parser.add_argument("-s", "--split", dest="SPLIT", help="split between amount of training and testing images",
-                    type=float, default=0.85)
-parser.add_argument("-mf", "--model_filename", dest="MODEL_FILENAME",
-                    help="name (path) to model of CNN to be saved",
-                    type=str, default="model")
 parser.add_argument("--batch_size", dest="BATCH_SIZE", help="DataLoader batch size",
                     type=int, default=64)
 parser.add_argument("--num_workers", dest="NUM_WORKERS", help="DataLoader number of workers",
