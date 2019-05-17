@@ -185,11 +185,16 @@ if __name__ == "__main__":
     #
     #
     # def freeze_params(parameters):
+    #     model_layers_len = 0
+    #     for para in parameters:
+    #         model_layers_len += 1
+    #         para.requires_grad = False
     #     freeze_idx = 0
     #     for para in parameters:
-    #         if freeze_idx >= FREEZE_LAYERS_NUMBER:
-    #             para.requires_grad = False
     #         freeze_idx += 1
+    #         if freeze_idx >= model_layers_len - FREEZE_LAYERS_NUMBER:
+    #             para.requires_grad = True
+
 
     # create model
     model_ft = models.vgg16(pretrained=True)
