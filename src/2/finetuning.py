@@ -12,9 +12,20 @@ from torch.optim import lr_scheduler
 import numpy as np
 from torchvision import datasets, models, transforms
 from tensorboardX import SummaryWriter
+import sys
+import matplotlib
 import copy
 import pickle
+import random
 import re
+import torchnet
+import plotly
+import plotly.graph_objs as go
+
+sys.path.append("..")
+from eval import *
+
+np.set_printoptions(threshold=sys.maxsize)
 
 DATA_DIR = '../data/'
 LOG_DIR = 'logs/'
@@ -28,166 +39,239 @@ IMAGE_INPUT_SIZE = 224
 
 TRAIN_PART = 0.8
 VALIDATION_PART = 0.1
-# TEST_PART = 0.1
+TEST_PART = 0.1
 
 parser = ArgumentParser(formatter_class=RawTextHelpFormatter)
+parser.add_argument("-e", "--experiment-dir", dest="EXPERIMENT_DIR", help="Pack whole experiment in one directory"
+                                                                          "with predeclared filenames",
+                    metavar="FILE", type=str, default=None)
 parser.add_argument("--batch_size", dest="BATCH_SIZE", help="DataLoader batch size",
                     type=int, default=64)
 parser.add_argument("--num_workers", dest="NUM_WORKERS", help="DataLoader number of workers",
-                    type=int, default=0)
+                    type=int, default=8)
 parser.add_argument("--epochs", dest="EPOCHS", help="number of epochs",
-                    type=int, default=100)
+                    type=int, default=30)
 parser.add_argument("--learning_rate", dest="LEARNING_RATE", help="learning rate",
-                    type=float, default=0.001)
+                    type=float, default=0.04)
 parser.add_argument("--weight_decay", dest="WEIGHT_DECAY", help="weight decay (L2)",
                     type=float, default=0)
 parser.add_argument("--momentum", dest="MOMENTUM", help="momentum for optimizers",
                     type=float, default=0.9)
+parser.add_argument("--step_size", dest="STEP_SIZE", help="step size (step LR)",
+                    type=int, default=25)
+parser.add_argument("--gamma", dest="GAMMA", help="gamma (step LR)",
+                    type=float, default=0.1)
+parser.add_argument("--use_scheduler", dest="USE_SCHEDULER", help="use scheduler for optimizer",
+                    action='store_true')
+parser.add_argument("--nogpu", dest="NOGPU", help="Specify if you don't want to use GPU (CUDA)",
+                    action='store_true')
+parser.add_argument("--roc_drawing", dest="ROC_DRAWING", help="ROC will be drawn once every N-th epochs. Specify N.",
+                    type=int, default=5)
+
+
+# parser.add_argument("-fln", "--freeze_layers_number", dest="FREEZE_LAYERS_NUMBER", help="how many layers should be"
+#                                                                                         "NOT frozen "
+#                                                                                         "(counting from the end)",
+#                     type=int, default=6)
 
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
-    best_model_wts = copy.deepcopy(model.state_dict())
-    best_acc_train = 0.0
-    best_acc_val = 0.0
+    confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
+    accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
+    total_loss_meter = 0
+    auc_meter_list = [torchnet.meter.AUCMeter() for _ in range(NUM_CLASSES)]
+    auc_avg = torchnet.meter.AUCMeter()
 
     for epoch in range(num_epochs):
         logger.info('-' * 60)
-        logger.info('Epoch {}/{}'.format(epoch, num_epochs - 1))
+        logger.info('Epoch {}/{}'.format(epoch + 1, num_epochs))
         logger.info('-' * 10)
 
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
+            confusion_matrix.reset()
+            accuracy_meter.reset()
+            total_loss_meter = 0
+            for auc_meter in auc_meter_list:
+                auc_meter.reset()
+            auc_avg.reset()
+            data_processed = 0
+
             if phase == 'train':
-                scheduler.step()
-                model.train(True)  # Set model to training mode
+                if args.USE_SCHEDULER:
+                    scheduler.step()
+                model.train()  # Set model to training mode
             else:
-                model.train(False)  # Set model to evaluate mode
-            running_loss = 0.0
-            running_corrects = 0
-            running_corrects_preterm = 0
-            preterm_size = 0
-            if torch.__version__ == '0.3.1b0+4cf3225':
-                confusion_matrix = torch.zeros(2, 2)
-            else:
-                confusion_matrix = torch.zeros([2, 2], dtype=torch.int32)
+                model.eval()  # Set model to evaluate mode
 
             # Iterate over data.
             for data in data_loaders[phase]:
                 # get the inputs
                 inputs, labels = data
+                inputs = inputs.to(device)
+                labels = labels.to(device)
 
-                # wrap them in Variable
-                if torch.__version__ == '0.3.1b0+4cf3225':
-                    if use_gpu:
-                        inputs = Variable(inputs.cuda())
-                        labels = Variable(labels.cuda())
-                    else:
-                        inputs, labels = Variable(inputs), Variable(labels)
-                else:
-                    inputs = inputs.to(device)
-                    labels = labels.to(device)
-                # if use_gpu:
-                #     inputs = Variable(inputs.cuda())
-                #     labels = Variable(labels.cuda())
-                # else:
-                #     inputs, labels = Variable(inputs), Variable(labels)
+                # indicate progress
+                data_processed += len(labels)
+                print('{}/{}'.format(data_processed, datasets_len[phase]), end='\r')
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward
-                if phase == 'train':
-                    # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
-                    outputs, aux_outputs = model(inputs)
-                    _, preds = torch.max(outputs.data, 1)
-                    loss1 = criterion(outputs, labels)
-                    loss2 = criterion(aux_outputs, labels)
-                    loss = loss1 + 0.4 * loss2
-                else:
+                with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(inputs)
                     _, preds = torch.max(outputs.data, 1)
                     loss = criterion(outputs, labels)
 
-                # backward + optimize only if in training phase
-                if phase == 'train':
-                    loss.backward()
-                    optimizer.step()
+                    # backward + optimize only if in training phase
+                    if phase == 'train':
+                        loss.backward()
+                        optimizer.step()
 
                 # statistics
-                if torch.__version__ == '0.3.1b0+4cf3225':
-                    running_loss += float(loss.data[0]) * float(inputs.size(0))
-                    # print(float(loss.data[0]), float(inputs.size(0)),
-                    #       float(float(loss.data[0]) * float(inputs.size(0))), running_loss)
-                else:
-                    running_loss += float(loss.item()) * float(inputs.size(0))
-                    # print(loss, loss.item(), inputs.size(0))
-                running_corrects += torch.sum(preds == labels.data)
+                # basic
+                total_loss_meter += float(loss.item()) * float(inputs.size(0))
+                confusion_matrix.add(outputs.data.squeeze(), labels.type(torch.LongTensor))
+                accuracy_meter.add(outputs.data, labels.data)
+                # auc meter
+                for ii in range(NUM_CLASSES):
+                    targets = []
+                    for jj in labels.data:
+                        targets.append(1 if int(jj) == ii else 0)
+                    auc_meter_list[ii].add(outputs.data[:, ii], np.array(targets))
+                    auc_avg.add(outputs.data[:, ii], np.array(targets))
 
-                for b_idx in range(args.BATCH_SIZE):
-                    if int(labels.data[b_idx]) == 1:
-                        preterm_size += 1
-                        if int(preds[b_idx]) == 1:
-                            running_corrects_preterm += 1
-                    if int(preds[b_idx]) == 0 or int(preds[b_idx]) == 1:
-                        confusion_matrix[int(labels.data[b_idx])][int(preds[b_idx])] += 1
-                    # if int(labels.data[b_idx]) == 1 and not is_inception:
-                    #     logger.info('Prediction: {}, outputs: {:.2f}, {:.2f}'.format(int(preds[b_idx]),
-                    #                                                                float(outputs[b_idx][0]),
-                    #                                                                float(outputs[b_idx][1])))
-                    # elif int(labels.data[b_idx]) == 1:
-                    #     logger.info('Prediction: {}, outputs main: {:.2f}, {:.2f}\t'
-                    #                 '   aux: {:.2f}, {:.2f}'.format(int(preds[b_idx]),
-                    #                                             float(outputs[b_idx][0]),
-                    #                                             float(outputs[b_idx][1]),
-                    #                                             float(aux_outputs[b_idx][0]),
-                    #                                             float(aux_outputs[b_idx][1])))
+            logger.info('{}'.format(phase))
+            epoch_loss = total_loss_meter / datasets_len[phase]
+            logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
+            logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
+            logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
 
-            epoch_loss = running_loss / datasets_len[phase]
-            epoch_acc = int(running_corrects) / datasets_len[phase]
-            epoch_acc_preterm = int(running_corrects_preterm) / preterm_size
-
-            logger.info('{} Loss: {:.4f} Acc: {:.4f}, Preterm_Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc,
-                                                                                  epoch_acc_preterm))
-            logger.info('\n' + str(confusion_matrix))
             if phase == 'train':
                 writer.add_scalar('Train/Loss', epoch_loss, epoch)
-                writer.add_scalar('Train/Accuracy', epoch_acc, epoch)
+                writer.add_scalar('Train/Accuracy-top1', accuracy_meter.value(k=1), epoch)
+                writer.add_scalar('Train/Accuracy-top5', accuracy_meter.value(k=5), epoch)
             elif phase == 'val':
-                writer.add_scalar('Test/Loss', epoch_loss, epoch)
-                writer.add_scalar('Test/Accuracy', epoch_acc, epoch)
+                writer.add_scalar('Val/Loss', epoch_loss, epoch)
+                writer.add_scalar('Val/Accuracy-top1', accuracy_meter.value(k=1), epoch)
+                writer.add_scalar('Val/Accuracy-top5', accuracy_meter.value(k=5), epoch)
 
-            # # deep copy and save the model with best accuracy
-            # if phase == 'val' and epoch_acc >= best_acc_val:
-            #     best_acc_val = epoch_acc
-            #     torch.save(model.state_dict(), MODEL_FILENAME + '_test')
-            #     logger.info('[test] Model with best accuracy overall saved.')
-            #
-            # # deep copy and save the model with best preterm accuracy
-            # if phase == 'val' and epoch_acc_preterm >= best_acc_preterm_val:
-            #     best_acc_preterm_val = epoch_acc_preterm
-            #     torch.save(model.state_dict(), MODEL_FILENAME + '_test_preterm')
-            #     logger.info('[test] Model with best accuracy in preterm saved.')
-            # # deep copy and save the model with best accuracy
-            # if phase == 'train' and epoch_acc >= best_acc_train:
-            #     best_acc_train = epoch_acc
-            #     torch.save(model.state_dict(), MODEL_FILENAME + '_train')
-            #     logger.info('[train] Model with best accuracy overall saved.')
-            #
-            # # deep copy and save the model with best preterm accuracy
-            # if phase == 'train' and epoch_acc_preterm >= best_acc_preterm_train:
-            #     best_acc_preterm_train = epoch_acc_preterm
-            #     torch.save(model.state_dict(), MODEL_FILENAME + '_train_preterm')
-            #     logger.info('[train] Model with best accuracy in preterm saved.')
+            # ROC curve
+            if epoch % args.ROC_DRAWING == 0:
+                mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
+                                      mode='lines',
+                                      line=dict(color='navy', width=2, dash='dash'),
+                                      showlegend=False)
+                auc, tpr, fpr = auc_avg.value()
+                avg_lane = go.Scatter(x=fpr, y=tpr,
+                                      mode='lines',
+                                      line=dict(color='deeppink', width=1, dash='dot'),
+                                      name='average ROC curve (area = {:.2f})'.format(float(auc)))
+                traces = [mid_lane, avg_lane]
+                for ii in range(NUM_CLASSES):
+                    auc, tpr, fpr = auc_meter_list[ii].value()
+                    color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255),
+                                                     random.randint(0, 255))
+                    trace = go.Scatter(x=fpr, y=tpr,
+                                       mode='lines',
+                                       line=dict(color=color, width=1),
+                                       name='{} (area = {:.2f})'.format(idx_to_class[ii], float(auc))
+                                       )
+                    traces.append(trace)
+                layout = go.Layout(title='Receiver operating characteristic',
+                                   xaxis=dict(title='False Positive Rate'),
+                                   yaxis=dict(title='True Positive Rate'))
+                plotly.offline.plot({
+                    "data": traces,
+                    "layout": layout
+                }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}.html'.format(epoch, phase))
 
-        logger.info('\n')
+    # # load best model weights
+    # model.load_state_dict(best_model_wts)
+    return model
 
-    # time_elapsed = time.time() - since
-    # logger.info('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-    logger.info('Best val Acc val: {:4f}'.format(best_acc_val))
-    logger.info('Best val Acc train: {:4f}'.format(best_acc_train))
 
-    # load best model weights
-    model.load_state_dict(best_model_wts)
+def test_model(model):
+    confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
+    accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
+    total_loss_meter = 0
+    auc_meter_list = [torchnet.meter.AUCMeter() for _ in range(NUM_CLASSES)]
+    auc_avg = torchnet.meter.AUCMeter()
+    data_processed = 0
+
+    logger.info('-' * 60)
+    logger.info('Test Model')
+    logger.info('-' * 60)
+
+    model.eval()  # Set model to evaluate mode
+
+    # Iterate over data.
+    for data in data_loaders['test']:
+        # get the inputs
+        inputs, labels = data
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        # indicate progress
+        data_processed += len(labels)
+        print('{}/{}'.format(data_processed, datasets_len['test']), end='\r')
+
+        # forward
+        with torch.set_grad_enabled(False):
+            outputs = model(inputs)
+            _, preds = torch.max(outputs.data, 1)
+            loss = criterion(outputs, labels)
+
+        # statistics
+        # basic
+        total_loss_meter += float(loss.item()) * float(inputs.size(0))
+        confusion_matrix.add(outputs.data.squeeze(), labels.type(torch.LongTensor))
+        accuracy_meter.add(outputs.data, labels.data)
+        # auc meter
+        for ii in range(NUM_CLASSES):
+            targets = []
+            for jj in labels.data:
+                targets.append(1 if int(jj) == ii else 0)
+            auc_meter_list[ii].add(outputs.data[:, ii], np.array(targets))
+            auc_avg.add(outputs.data[:, ii], np.array(targets))
+
+    epoch_loss = total_loss_meter / datasets_len['test']
+    logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
+    logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
+    logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
+
+    # ROC curve
+    mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
+                          mode='lines',
+                          line=dict(color='navy', width=2, dash='dash'),
+                          showlegend=False)
+    auc, tpr, fpr = auc_avg.value()
+    avg_lane = go.Scatter(x=fpr, y=tpr,
+                          mode='lines',
+                          line=dict(color='deeppink', width=1, dash='dot'),
+                          name='average ROC curve (area = {:.2f})'.format(float(auc)))
+    traces = [mid_lane, avg_lane]
+    for ii in range(NUM_CLASSES):
+        auc, tpr, fpr = auc_meter_list[ii].value()
+        color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255),
+                                         random.randint(0, 255))
+        trace = go.Scatter(x=fpr, y=tpr,
+                           mode='lines',
+                           line=dict(color=color, width=1),
+                           name='{} (area = {:.2f})'.format(idx_to_class[ii], float(auc))
+                           )
+        traces.append(trace)
+    layout = go.Layout(title='Receiver operating characteristic',
+                       xaxis=dict(title='False Positive Rate'),
+                       yaxis=dict(title='True Positive Rate'))
+    plotly.offline.plot({
+        "data": traces,
+        "layout": layout
+    }, auto_open=False, filename=EXPERIMENT_DIR + 'test.html')
+
+    # # load best model weights
+    # model.load_state_dict(best_model_wts)
     return model
 
 
@@ -195,16 +279,27 @@ if __name__ == "__main__":
     # parse args
     args = parser.parse_args()
 
+    EXPERIMENT_DIR = args.EXPERIMENT_DIR
+    if EXPERIMENT_DIR is not None:
+        if EXPERIMENT_DIR[-1] is not '/':
+            EXPERIMENT_DIR += '/'
+        if not os.path.isdir(EXPERIMENT_DIR):
+            os.mkdir(EXPERIMENT_DIR)
+        else:
+            raise Exception('Experiment with name {} already exists'.format(EXPERIMENT_DIR))
+    else:
+        raise Exception('No experiment directory given.')
+
     # create logger
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
 
     # make sure logging directory 'logs' is available
-    if not os.path.isdir(LOG_DIR):
-        os.mkdir(LOG_DIR)
+    if not os.path.isdir(EXPERIMENT_DIR + LOG_DIR):
+        os.mkdir(EXPERIMENT_DIR + LOG_DIR)
 
     # create file handler which logs messages
-    fh = logging.FileHandler(LOG_DIR + str(os.path.basename(__file__).split('.')[0]) + '.log')
+    fh = logging.FileHandler(EXPERIMENT_DIR + LOG_DIR + str(os.path.basename(__file__).split('.')[0]) + '.log')
     fh.setLevel(logging.DEBUG)
 
     # create console handler to print to screen
@@ -222,37 +317,38 @@ if __name__ == "__main__":
     logger.info(args)
 
     # tensorboardX logger
-    tensorboard_dir = LOG_DIR + 'tensorboard'
+    tensorboard_dir = EXPERIMENT_DIR + LOG_DIR + 'tensorboard'
     if not os.path.isdir(tensorboard_dir):
         os.mkdir(tensorboard_dir)
     writer = SummaryWriter(tensorboard_dir)
 
-    # FREEZE_LAYERS_NUMBER = 1
-    #
-    #
-    # def freeze_params(parameters):
-    #     freeze_idx = 0
-    #     for para in parameters:
-    #         if freeze_idx >= FREEZE_LAYERS_NUMBER:
-    #             para.requires_grad = False
-    #         freeze_idx += 1
+    FREEZE_LAYERS_NUMBER = 6 + 16
+
+
+    def freeze_params(parameters):
+        params = []
+        for para in parameters:
+            para.requires_grad_(False)
+            params.append(para)
+        reversed_params = params[::-1]
+        for param in range(min(FREEZE_LAYERS_NUMBER, len(reversed_params))):
+            reversed_params[param].requires_grad_(True)
+
 
     # create model
-    model_ft = models.vgg16(pretrained=True)
-    model_ft.classifier = nn.Sequential(
-        nn.Dropout(p=0.5),
-        nn.Linear(512 * 7 * 7, 4096, bias=True),
-        nn.ReLU(inplace=True),
-        nn.Dropout(p=0.5),
-        nn.Linear(4096, 4096, bias=True),
-        nn.ReLU(inplace=True),
-        nn.Linear(4096, NUM_CLASSES)
-    )
-
-    # freeze all fully-connected layers
-    for para in model_ft.classifier.parameters():
-        para.requires_grad = False
-    # freeze_params(model_ft.parameters())
+    model_ft = models.vgg19_bn(pretrained=True)
+    freeze_params(model_ft.parameters())
+    # # newly created layers have requires_grad == True
+    # model_ft.classifier[6] = nn.Sequential(
+    #     nn.Dropout(p=0.5),
+    #     nn.Linear(512 * 7 * 7, 4096, bias=True),
+    #     nn.ReLU(inplace=True),
+    #     nn.Dropout(p=0.5),
+    #     nn.Linear(4096, 4096, bias=True),
+    #     nn.ReLU(inplace=True),
+    #     nn.Linear(4096, NUM_CLASSES)
+    # )
+    model_ft.classifier[6] = nn.Linear(4096, NUM_CLASSES)
 
     # normalization
     data_transforms = {
@@ -275,43 +371,54 @@ if __name__ == "__main__":
     # prepare datasets for training, validating and testing with DataLoaders
     dataset_all = datasets.ImageFolder(root=os.path.abspath('../../data').replace('\\', '/'))
     dataset_all_len = int(len(dataset_all))
-    datasets_len = {'train': int(dataset_all_len * TRAIN_PART), 'val': int(dataset_all_len - VALIDATION_PART)}
+    datasets_len = {'train': int(dataset_all_len * TRAIN_PART), 'val': int(dataset_all_len * VALIDATION_PART)}
     datasets_len['test'] = int(dataset_all_len - datasets_len['train'] - datasets_len['val'])
-    dataset_train, dataset_val, dataset_data = random_split(dataset_all,
+    dataset_train, dataset_val, dataset_test = random_split(dataset_all,
                                                             [datasets_len['train'],
                                                              datasets_len['val'],
                                                              datasets_len['test']])
-    dataset_train.trasform = data_transforms['train']
-    dataset_val.trasform = data_transforms['val']
-    dataset_data.trasform = data_transforms['val']
+    dataset_train.dataset.transform = data_transforms['train']
+    dataset_val.dataset.transform = data_transforms['val']
+    dataset_test.dataset.transform = data_transforms['val']
 
-    train_dataloader = DataLoader(dataset_train, batch_size=args.BATCH_SIZE, shuffle=True)
-    val_dataloader = DataLoader(dataset_val, batch_size=args.BATCH_SIZE, shuffle=True)
-    test_dataloader = DataLoader(dataset_data, batch_size=args.BATCH_SIZE, shuffle=True)
+    train_dataloader = DataLoader(dataset_train, batch_size=args.BATCH_SIZE, shuffle=True, num_workers=args.NUM_WORKERS)
+    val_dataloader = DataLoader(dataset_val, batch_size=args.BATCH_SIZE, shuffle=True, num_workers=args.NUM_WORKERS)
+    test_dataloader = DataLoader(dataset_test, batch_size=args.BATCH_SIZE, shuffle=True, num_workers=args.NUM_WORKERS)
 
     data_loaders = {'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader}
 
+    # Create map index -> class name
+    idx_to_class = res = dict((v, k) for k, v in dataset_all.class_to_idx.items())
+    # logger.info(idx_to_class)
+    # Get rid of rubbish in class name
+    for i in idx_to_class:
+        search_re = re.search(r'(n\d+-)(\w+)', idx_to_class[i], re.I)
+        if search_re is not None:
+            idx_to_class[i] = search_re.group(2)
+    logger.info(idx_to_class)
+
     # check if can use GPU
-    if torch.__version__ == '0.3.1b0+4cf3225':
-        use_gpu = torch.cuda.is_available()
-        if use_gpu:
-            model_ft = model_ft.cuda()
-    else:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model_ft = model_ft.to(device)
+    device = torch.device("cuda" if torch.cuda.is_available() and not args.NOGPU else "cpu")
+    model_ft = model_ft.to(device)
 
     criterion = nn.CrossEntropyLoss()
 
-    logger.info(
-        'SGD: lr = {};  momentum = {}, weight decay = {}'.format(args.LEARNING_RATE, args.MOMENTUM, args.WEIGHT_DECAY))
-    optimizer_ft = optim.SGD(filter(lambda p: p.requires_grad, model_ft.parameters()),
-                             lr=args.LEARNING_RATE, momentum=args.MOMENTUM, weight_decay=args.WEIGHT_DECAY)
+    params_to_update = []
+    for name, param in model_ft.named_parameters():
+        if param.requires_grad:
+            params_to_update.append(param)
+            logger.info("\t{}".format(name))
 
-    # Decay LR by a factor of 0.1 every 7 epochs
-    step_size = 7
-    gamma = 0.1
-    logger.info('StepLR: step_size = {};  gamma = {}'.format(step_size, gamma))
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=step_size, gamma=gamma)
+    logger.info('SGD: lr = {};  momentum = {}, weight decay = {}'.format(
+        args.LEARNING_RATE, args.MOMENTUM, args.WEIGHT_DECAY))
+
+    optimizer_ft = optim.SGD(params_to_update, lr=args.LEARNING_RATE, momentum=args.MOMENTUM,
+                             weight_decay=args.WEIGHT_DECAY)
+
+    # Decay LR by a factor of x every y epochs
+    logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
 
     model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
                            num_epochs=args.EPOCHS)
+    test_model(model_ft)

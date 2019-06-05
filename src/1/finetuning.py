@@ -204,7 +204,6 @@ def test_model(model):
     logger.info('Test Model')
     logger.info('-' * 60)
 
-
     model.eval()  # Set model to evaluate mode
 
     # Iterate over data.
@@ -218,13 +217,11 @@ def test_model(model):
         data_processed += len(labels)
         print('{}/{}'.format(data_processed, datasets_len['test']), end='\r')
 
-
         # forward
         with torch.set_grad_enabled(False):
             outputs = model(inputs)
             _, preds = torch.max(outputs.data, 1)
             loss = criterion(outputs, labels)
-
 
         # statistics
         # basic
@@ -243,7 +240,6 @@ def test_model(model):
     logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
     logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
     logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
-
 
     # ROC curve
     mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
@@ -342,16 +338,17 @@ if __name__ == "__main__":
     # create model
     model_ft = models.vgg19_bn(pretrained=True)
     freeze_params(model_ft.parameters())
-    # newly created layers have requires_grad == True
-    model_ft.classifier = nn.Sequential(
-        nn.Dropout(p=0.5),
-        nn.Linear(512 * 7 * 7, 4096, bias=True),
-        nn.ReLU(inplace=True),
-        nn.Dropout(p=0.5),
-        nn.Linear(4096, 4096, bias=True),
-        nn.ReLU(inplace=True),
-        nn.Linear(4096, NUM_CLASSES)
-    )
+    # # newly created layers have requires_grad == True
+    # model_ft.classifier[6] = nn.Sequential(
+    #     nn.Dropout(p=0.5),
+    #     nn.Linear(512 * 7 * 7, 4096, bias=True),
+    #     nn.ReLU(inplace=True),
+    #     nn.Dropout(p=0.5),
+    #     nn.Linear(4096, 4096, bias=True),
+    #     nn.ReLU(inplace=True),
+    #     nn.Linear(4096, NUM_CLASSES)
+    # )
+    model_ft.classifier[6] = nn.Linear(4096, NUM_CLASSES)
 
     # normalization
     data_transforms = {
