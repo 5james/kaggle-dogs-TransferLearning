@@ -14,7 +14,6 @@ from torchvision import datasets, models, transforms
 from tensorboardX import SummaryWriter
 import sys
 import matplotlib
-from eval import *
 import copy
 import pickle
 import random
@@ -24,6 +23,7 @@ import plotly
 import plotly.graph_objs as go
 
 sys.path.append("..")
+from eval import *
 
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -283,9 +283,9 @@ if __name__ == "__main__":
     dataset_val.dataset.transform = data_transforms['val']
     dataset_test.dataset.transform = data_transforms['val']
 
-    train_dataloader = DataLoader(dataset_train, batch_size=args.BATCH_SIZE, shuffle=True)
-    val_dataloader = DataLoader(dataset_val, batch_size=args.BATCH_SIZE, shuffle=True)
-    test_dataloader = DataLoader(dataset_test, batch_size=args.BATCH_SIZE, shuffle=True)
+    train_dataloader = DataLoader(dataset_train, batch_size=args.BATCH_SIZE, shuffle=True, num_workers=args.NUM_WORKERS)
+    val_dataloader = DataLoader(dataset_val, batch_size=args.BATCH_SIZE, shuffle=True, num_workers=args.NUM_WORKERS)
+    test_dataloader = DataLoader(dataset_test, batch_size=args.BATCH_SIZE, shuffle=True, num_workers=args.NUM_WORKERS)
 
     data_loaders = {'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader}
 
