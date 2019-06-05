@@ -81,6 +81,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     total_loss_meter = 0
     auc_meter_list = [torchnet.meter.AUCMeter() for _ in range(NUM_CLASSES)]
     auc_avg = torchnet.meter.AUCMeter()
+    average_precision = torchnet.meter.APMeter()
+    mean_squared_error = torchnet.meter.MSEMeter()
 
     for epoch in range(num_epochs):
         logger.info('-' * 60)
@@ -95,6 +97,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             for auc_meter in auc_meter_list:
                 auc_meter.reset()
             auc_avg.reset()
+            average_precision.reset()
+            mean_squared_error.reset()
             data_processed = 0
 
             if phase == 'train':
@@ -134,6 +138,13 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 total_loss_meter += float(loss.item()) * float(inputs.size(0))
                 confusion_matrix.add(outputs.data.squeeze(), labels.type(torch.LongTensor))
                 accuracy_meter.add(outputs.data, labels.data)
+                for ii in range(len(labels.data)):
+                    label = int(labels.data[ii])
+                    hot_one = [0]*NUM_CLASSES
+                    hot_one[label] = 1
+                    hot_one = np.array(hot_one)
+                    average_precision.add(outputs.data[ii], hot_one)
+
                 # auc meter
                 for ii in range(NUM_CLASSES):
                     targets = []
@@ -147,15 +158,20 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
             logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
             logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
+            logger.info('Confusion matrix:\n{}'.format(confusion_matrix.value()))
+            logger.info('Average Precision = \n{}'.format(average_precision.value()))
+            logger.info('Mean Average Precision = {:6.4f}'.format(float(average_precision.value().mean())))
 
             if phase == 'train':
                 writer.add_scalar('Train/Loss', epoch_loss, epoch)
                 writer.add_scalar('Train/Accuracy-top1', accuracy_meter.value(k=1), epoch)
                 writer.add_scalar('Train/Accuracy-top5', accuracy_meter.value(k=5), epoch)
+                writer.add_scalar('Train/Mean-Avg-Precision', float(average_precision.value().mean()), epoch)
             elif phase == 'val':
                 writer.add_scalar('Val/Loss', epoch_loss, epoch)
                 writer.add_scalar('Val/Accuracy-top1', accuracy_meter.value(k=1), epoch)
                 writer.add_scalar('Val/Accuracy-top5', accuracy_meter.value(k=5), epoch)
+                writer.add_scalar('Val/Mean-Avg-Precision', float(average_precision.value().mean()), epoch)
 
             # ROC curve
             if epoch % args.ROC_DRAWING == 0:
@@ -240,6 +256,7 @@ def test_model(model):
     logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
     logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
     logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
+    logger.info('Confusion matrix:\n{}'.format(confusion_matrix.value()))
 
     # ROC curve
     mid_lane = go.Scatter(x=[0, 1], y=[0, 1],

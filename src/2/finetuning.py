@@ -147,6 +147,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
             logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
             logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
+            logger.info('Confusion matrix:\n{}'.format(confusion_matrix.value()))
 
             if phase == 'train':
                 writer.add_scalar('Train/Loss', epoch_loss, epoch)
@@ -240,6 +241,7 @@ def test_model(model):
     logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
     logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
     logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
+    logger.info('Confusion matrix:\n{}'.format(confusion_matrix.value()))
 
     # ROC curve
     mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
