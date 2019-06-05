@@ -46,9 +46,9 @@ parser.add_argument("-e", "--experiment-dir", dest="EXPERIMENT_DIR", help="Pack 
                                                                           "with predeclared filenames",
                     metavar="FILE", type=str, default=None)
 parser.add_argument("--batch_size", dest="BATCH_SIZE", help="DataLoader batch size",
-                    type=int, default=32)
+                    type=int, default=64)
 parser.add_argument("--num_workers", dest="NUM_WORKERS", help="DataLoader number of workers",
-                    type=int, default=0)
+                    type=int, default=8)
 parser.add_argument("--epochs", dest="EPOCHS", help="number of epochs",
                     type=int, default=30)
 parser.add_argument("--learning_rate", dest="LEARNING_RATE", help="learning rate",
@@ -93,6 +93,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             for auc_meter in auc_meter_list:
                 auc_meter.reset()
             auc_avg.reset()
+            data_processed = 0
 
             if phase == 'train':
                 if args.USE_SCHEDULER:
@@ -107,6 +108,10 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 inputs, labels = data
                 inputs = inputs.to(device)
                 labels = labels.to(device)
+
+                # indicate progress
+                data_processed += len(labels)
+                print('{}/{}'.format(data_processed, datasets_len[phase]), end='\r')
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -159,7 +164,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             avg_lane = go.Scatter(x=fpr, y=tpr,
                                   mode='lines',
                                   line=dict(color='deeppink', width=1, dash='dot'),
-                                  name='average ROC curve (area = {0:0.2f})'.format(auc))
+                                  name='average ROC curve (area = {:.2f})'.format(float(auc)))
             traces = [mid_lane, avg_lane]
             for ii in range(NUM_CLASSES):
                 auc, tpr, fpr = auc_meter_list[ii].value()
@@ -296,7 +301,7 @@ if __name__ == "__main__":
 
     # Create map index -> class name
     idx_to_class = res = dict((v, k) for k, v in dataset_all.class_to_idx.items())
-    logger.info(idx_to_class)
+    # logger.info(idx_to_class)
     # Get rid of rubbish in class name
     for i in idx_to_class:
         search_re = re.search(r'(n\d+-)(\w+)', idx_to_class[i], re.I)
