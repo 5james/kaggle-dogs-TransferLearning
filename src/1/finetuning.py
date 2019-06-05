@@ -172,7 +172,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 trace = go.Scatter(x=fpr, y=tpr,
                                    mode='lines',
                                    line=dict(color=color, width=1),
-                                   name='{} (area = {0.2f})'.format(idx_to_class[ii], auc)
+                                   name='{} (area = {:.2f})'.format(idx_to_class[ii], float(auc))
                                    )
                 traces.append(trace)
             layout = go.Layout(title='Receiver operating characteristic',
