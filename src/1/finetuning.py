@@ -65,6 +65,8 @@ parser.add_argument("--use_scheduler", dest="USE_SCHEDULER", help="use scheduler
                     action='store_true')
 parser.add_argument("--nogpu", dest="NOGPU", help="Specify if you don't want to use GPU (CUDA)",
                     action='store_true')
+parser.add_argument("--roc_drawing", dest="ROC_DRAWING", help="ROC will be drawn once every N-th epochs. Specify N.",
+                    type=int, default=5)
 
 
 # parser.add_argument("-fln", "--freeze_layers_number", dest="FREEZE_LAYERS_NUMBER", help="how many layers should be"
@@ -156,7 +158,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 writer.add_scalar('Val/Accuracy-top5', accuracy_meter.value(k=5), epoch)
 
             # ROC curve
-            if epoch % 5 == 0:
+            if epoch % args.ROC_DRAWING == 0:
                 mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
                                       mode='lines',
                                       line=dict(color='navy', width=2, dash='dash'),
@@ -169,7 +171,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 traces = [mid_lane, avg_lane]
                 for ii in range(NUM_CLASSES):
                     auc, tpr, fpr = auc_meter_list[ii].value()
-                    color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+                    color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255),
+                                                     random.randint(0, 255))
                     trace = go.Scatter(x=fpr, y=tpr,
                                        mode='lines',
                                        line=dict(color=color, width=1),
@@ -182,7 +185,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 plotly.offline.plot({
                     "data": traces,
                     "layout": layout
-                }, auto_open=False, filename='{}-{}.html'.format(epoch, phase))
+                }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}.html'.format(epoch, phase))
 
     # # load best model weights
     # model.load_state_dict(best_model_wts)
