@@ -67,6 +67,12 @@ parser.add_argument("--nogpu", dest="NOGPU", help="Specify if you don't want to 
                     action='store_true')
 
 
+# parser.add_argument("-fln", "--freeze_layers_number", dest="FREEZE_LAYERS_NUMBER", help="how many layers should be"
+#                                                                                         "NOT frozen "
+#                                                                                         "(counting from the end)",
+#                     type=int, default=6)
+
+
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
     accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
@@ -224,23 +230,22 @@ if __name__ == "__main__":
         os.mkdir(tensorboard_dir)
     writer = SummaryWriter(tensorboard_dir)
 
-    FREEZE_LAYERS_NUMBER = 1
+    FREEZE_LAYERS_NUMBER = 6
 
 
     def freeze_params(parameters):
-        model_layers_len = 0
+        params = []
         for para in parameters:
-            model_layers_len += 1
-            para.requires_grad = False
-        freeze_idx = 0
-        for para in parameters:
-            freeze_idx += 1
-            if freeze_idx >= model_layers_len - FREEZE_LAYERS_NUMBER:
-                para.requires_grad = True
+            para.requires_grad_(False)
+            params.append(para)
+        reversed_params = params[::-1]
+        for param in range(min(FREEZE_LAYERS_NUMBER, len(reversed_params))):
+            reversed_params[param].requires_grad_(True)
 
 
     # create model
     model_ft = models.vgg19_bn(pretrained=True)
+    freeze_params(model_ft.parameters())
     # newly created layers have requires_grad == True
     model_ft.classifier = nn.Sequential(
         nn.Dropout(p=0.5),
