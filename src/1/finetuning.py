@@ -156,32 +156,33 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 writer.add_scalar('Val/Accuracy-top5', accuracy_meter.value(k=5), epoch)
 
             # ROC curve
-            mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
-                                  mode='lines',
-                                  line=dict(color='navy', width=2, dash='dash'),
-                                  showlegend=False)
-            auc, tpr, fpr = auc_avg.value()
-            avg_lane = go.Scatter(x=fpr, y=tpr,
-                                  mode='lines',
-                                  line=dict(color='deeppink', width=1, dash='dot'),
-                                  name='average ROC curve (area = {:.2f})'.format(float(auc)))
-            traces = [mid_lane, avg_lane]
-            for ii in range(NUM_CLASSES):
-                auc, tpr, fpr = auc_meter_list[ii].value()
-                color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                trace = go.Scatter(x=fpr, y=tpr,
-                                   mode='lines',
-                                   line=dict(color=color, width=1),
-                                   name='{} (area = {:.2f})'.format(idx_to_class[ii], float(auc))
-                                   )
-                traces.append(trace)
-            layout = go.Layout(title='Receiver operating characteristic',
-                               xaxis=dict(title='False Positive Rate'),
-                               yaxis=dict(title='True Positive Rate'))
-            plotly.offline.plot({
-                "data": traces,
-                "layout": layout
-            }, auto_open=False, filename='{}-{}.html'.format(epoch, phase))
+            if epoch % 5 == 0:
+                mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
+                                      mode='lines',
+                                      line=dict(color='navy', width=2, dash='dash'),
+                                      showlegend=False)
+                auc, tpr, fpr = auc_avg.value()
+                avg_lane = go.Scatter(x=fpr, y=tpr,
+                                      mode='lines',
+                                      line=dict(color='deeppink', width=1, dash='dot'),
+                                      name='average ROC curve (area = {:.2f})'.format(float(auc)))
+                traces = [mid_lane, avg_lane]
+                for ii in range(NUM_CLASSES):
+                    auc, tpr, fpr = auc_meter_list[ii].value()
+                    color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+                    trace = go.Scatter(x=fpr, y=tpr,
+                                       mode='lines',
+                                       line=dict(color=color, width=1),
+                                       name='{} (area = {:.2f})'.format(idx_to_class[ii], float(auc))
+                                       )
+                    traces.append(trace)
+                layout = go.Layout(title='Receiver operating characteristic',
+                                   xaxis=dict(title='False Positive Rate'),
+                                   yaxis=dict(title='True Positive Rate'))
+                plotly.offline.plot({
+                    "data": traces,
+                    "layout": layout
+                }, auto_open=False, filename='{}-{}.html'.format(epoch, phase))
 
     # # load best model weights
     # model.load_state_dict(best_model_wts)
