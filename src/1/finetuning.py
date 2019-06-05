@@ -192,6 +192,93 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     return model
 
 
+def test_model(model):
+    confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
+    accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
+    total_loss_meter = 0
+    auc_meter_list = [torchnet.meter.AUCMeter() for _ in range(NUM_CLASSES)]
+    auc_avg = torchnet.meter.AUCMeter()
+    data_processed = 0
+
+    logger.info('-' * 60)
+    logger.info('Test Model')
+    logger.info('-' * 60)
+
+
+    model.eval()  # Set model to evaluate mode
+
+    # Iterate over data.
+    for data in data_loaders['test']:
+        # get the inputs
+        inputs, labels = data
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        # indicate progress
+        data_processed += len(labels)
+        print('{}/{}'.format(data_processed, datasets_len['test']), end='\r')
+
+
+        # forward
+        with torch.set_grad_enabled(False):
+            outputs = model(inputs)
+            _, preds = torch.max(outputs.data, 1)
+            loss = criterion(outputs, labels)
+
+
+        # statistics
+        # basic
+        total_loss_meter += float(loss.item()) * float(inputs.size(0))
+        confusion_matrix.add(outputs.data.squeeze(), labels.type(torch.LongTensor))
+        accuracy_meter.add(outputs.data, labels.data)
+        # auc meter
+        for ii in range(NUM_CLASSES):
+            targets = []
+            for jj in labels.data:
+                targets.append(1 if int(jj) == ii else 0)
+            auc_meter_list[ii].add(outputs.data[:, ii], np.array(targets))
+            auc_avg.add(outputs.data[:, ii], np.array(targets))
+
+    epoch_loss = total_loss_meter / datasets_len['test']
+    logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
+    logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
+    logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
+
+
+    # ROC curve
+    mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
+                          mode='lines',
+                          line=dict(color='navy', width=2, dash='dash'),
+                          showlegend=False)
+    auc, tpr, fpr = auc_avg.value()
+    avg_lane = go.Scatter(x=fpr, y=tpr,
+                          mode='lines',
+                          line=dict(color='deeppink', width=1, dash='dot'),
+                          name='average ROC curve (area = {:.2f})'.format(float(auc)))
+    traces = [mid_lane, avg_lane]
+    for ii in range(NUM_CLASSES):
+        auc, tpr, fpr = auc_meter_list[ii].value()
+        color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255),
+                                         random.randint(0, 255))
+        trace = go.Scatter(x=fpr, y=tpr,
+                           mode='lines',
+                           line=dict(color=color, width=1),
+                           name='{} (area = {:.2f})'.format(idx_to_class[ii], float(auc))
+                           )
+        traces.append(trace)
+    layout = go.Layout(title='Receiver operating characteristic',
+                       xaxis=dict(title='False Positive Rate'),
+                       yaxis=dict(title='True Positive Rate'))
+    plotly.offline.plot({
+        "data": traces,
+        "layout": layout
+    }, auto_open=False, filename=EXPERIMENT_DIR + 'test.html')
+
+    # # load best model weights
+    # model.load_state_dict(best_model_wts)
+    return model
+
+
 if __name__ == "__main__":
     # parse args
     args = parser.parse_args()
@@ -337,3 +424,4 @@ if __name__ == "__main__":
 
     model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
                            num_epochs=args.EPOCHS)
+    test_model(model_ft)
