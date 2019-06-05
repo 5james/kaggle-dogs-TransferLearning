@@ -170,7 +170,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             plotly.offline.plot({
                 "data": traces,
                 "layout": layout
-            }, auto_open=True)
+            }, auto_open=False, filename='{}-{}.html'.format(epoch, phase))
 
     # # load best model weights
     # model.load_state_dict(best_model_wts)
