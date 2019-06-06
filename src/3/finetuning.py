@@ -510,6 +510,8 @@ if __name__ == "__main__":
 
     # reduce classifier to ONE Linear layer
     model_ft.classifier = nn.Sequential(*list(model_ft.classifier.children())[:-3])
+    num_ftrs = model_ft.classifier[-1].in_features
+    model_ft.classifier[-1] = nn.Linear(num_ftrs, NUM_CLASSES)
     conv_list = list(model_ft.features.children())
     # reduce all batchnorm2d layers
     batchnorm2d_type = type(conv_list[1])
