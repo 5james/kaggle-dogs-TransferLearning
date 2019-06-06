@@ -28,8 +28,8 @@ import plotly
 import plotly.graph_objs as go
 
 matplotlib.use('agg')
-sys.path.append("..")
-from eval import *
+sys.path.append("../4/")
+from cnn_codes_extraction import *
 
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -472,7 +472,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
 
     # ------------------------------------------------------------------------------------------------------------------
-    # Retrain whole network and extract CNN Codes
+    # Retrain whole network
 
     logger.info('-' * 90)
     logger.info('PHASE ONE')
@@ -498,8 +498,10 @@ if __name__ == "__main__":
     model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS)
     test_model_all(model_ft)
 
+    first_network = copy.deepcopy(model_ft)
+
     # ------------------------------------------------------------------------------------------------------------------
-    # Reduce and retrain network and extract CNN Codes
+    # Reduce and retrain network
 
     logger.info('-' * 90)
     logger.info('PHASE Two')
@@ -527,9 +529,9 @@ if __name__ == "__main__":
             logger.info("\t{}".format(name))
 
     logger.info('SGD: lr = {};  momentum = {}, weight decay = {}'.format(
-        args.LEARNING_RATE, args.MOMENTUM, args.WEIGHT_DECAY))
+        args.LEARNING_RATE, 0, args.WEIGHT_DECAY))
 
-    optimizer_ft = optim.SGD(params_to_update, lr=args.LEARNING_RATE, momentum=args.MOMENTUM,
+    optimizer_ft = optim.SGD(params_to_update, lr=args.LEARNING_RATE, momentum=0,
                              weight_decay=args.WEIGHT_DECAY)
 
     # Decay LR by a factor of x every y epochs
@@ -539,5 +541,40 @@ if __name__ == "__main__":
     model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS)
     test_model_all(model_ft)
 
+    second_network = copy.deepcopy(model_ft)
+
     # ------------------------------------------------------------------------------------------------------------------
-    # Extract SVM codes
+    # Extract SVM codes from first and second network
+    use_gpu = torch.cuda.is_available() and not args.NOGPU
+
+    remaining_classifier_len = len(first_network.classifier)
+    first_network.classifier = nn.Sequential(*list(first_network.classifier.children())[:-remaining_classifier_len])
+
+    filename_x = EXPERIMENT_DIR + 'first_cnn_codes_train_X.h5'
+    filename_y = EXPERIMENT_DIR + 'first_cnn_codes_train_y.h5'
+    extract_cnn_codes(first_network, data_loaders['train'], filename_x, filename_y, logger, args.BATCH_SIZE,
+                      dataset_train, use_gpu)
+    filename_x = EXPERIMENT_DIR + 'first_cnn_codes_val_X.h5'
+    filename_y = EXPERIMENT_DIR + 'first_cnn_codes_val_y.h5'
+    extract_cnn_codes(first_network, data_loaders['val'], filename_x, filename_y, logger, args.BATCH_SIZE,
+                      dataset_val, use_gpu)
+    filename_x = EXPERIMENT_DIR + 'first_cnn_codes_test_X.h5'
+    filename_y = EXPERIMENT_DIR + 'first_cnn_codes_test_y.h5'
+    extract_cnn_codes(first_network, data_loaders['test'], filename_x, filename_y, logger, args.BATCH_SIZE,
+                      dataset_test, use_gpu)
+
+    remaining_classifier_len = len(second_network.classifier)
+    second_network.classifier = nn.Sequential(*list(second_network.classifier.children())[:-remaining_classifier_len])
+
+    filename_x = EXPERIMENT_DIR + 'second_cnn_codes_train_X.h5'
+    filename_y = EXPERIMENT_DIR + 'second_cnn_codes_train_y.h5'
+    extract_cnn_codes(second_network, data_loaders['train'], filename_x, filename_y, logger, args.BATCH_SIZE,
+                      dataset_train, use_gpu)
+    filename_x = EXPERIMENT_DIR + 'second_cnn_codes_val_X.h5'
+    filename_y = EXPERIMENT_DIR + 'second_cnn_codes_val_y.h5'
+    extract_cnn_codes(second_network, data_loaders['val'], filename_x, filename_y, logger, args.BATCH_SIZE,
+                      dataset_val, use_gpu)
+    filename_x = EXPERIMENT_DIR + 'second_cnn_codes_test_X.h5'
+    filename_y = EXPERIMENT_DIR + 'second_cnn_codes_test_y.h5'
+    extract_cnn_codes(second_network, data_loaders['test'], filename_x, filename_y, logger, args.BATCH_SIZE,
+                      dataset_test, use_gpu)
