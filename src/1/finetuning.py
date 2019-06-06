@@ -14,6 +14,7 @@ from torchvision import datasets, models, transforms
 from tensorboardX import SummaryWriter
 import sys
 import matplotlib
+import matplotlib.pyplot as plt
 import copy
 import pickle
 from textwrap import wrap
@@ -83,7 +84,7 @@ def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
     # np.set_printoptions(precision=2)
     ###fig, ax = matplotlib.figure.Figure()
 
-    fig = matplotlib.figure.Figure(figsize=(14, 14), dpi=640, facecolor='w', edgecolor='k')
+    fig = plt.figure(figsize=(14, 14), dpi=640, facecolor='w', edgecolor='k')
     ax = fig.add_subplot(1, 1, 1)
     im = ax.imshow(cm, cmap='Oranges')
 
@@ -215,6 +216,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 writer.add_scalar('Val/Accuracy-top1', accuracy_meter.value(k=1), epoch)
                 writer.add_scalar('Val/Accuracy-top5', accuracy_meter.value(k=5), epoch)
                 writer.add_scalar('Val/Mean-Avg-Precision', float(average_precision.value().mean()), epoch)
+                writer.add_figure('Val/Confusion-Matrix', figure, epoch)
 
             # ROC curve
             if epoch % args.ROC_DRAWING == 0:
