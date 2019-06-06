@@ -14,14 +14,19 @@ from torchvision import datasets, models, transforms
 from tensorboardX import SummaryWriter
 import sys
 import matplotlib
+import matplotlib.pyplot as plt
 import copy
 import pickle
-import random
+from textwrap import wrap
 import re
+import itertools
+import random
 import torchnet
+import torch
 import plotly
 import plotly.graph_objs as go
 
+matplotlib.use('agg')
 sys.path.append("..")
 from eval import *
 
@@ -75,12 +80,49 @@ parser.add_argument("--roc_drawing", dest="ROC_DRAWING", help="ROC will be drawn
 #                     type=int, default=6)
 
 
+def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
+    # np.set_printoptions(precision=2)
+    ###fig, ax = matplotlib.figure.Figure()
+
+    fig = plt.figure(figsize=(20, 20), dpi=640, facecolor='w', edgecolor='k')
+    ax = fig.add_subplot(1, 1, 1)
+    im = ax.imshow(cm, cmap='Oranges')
+
+    tick_marks = np.arange(len(classes))
+
+    ax.set_xlabel('Predicted', fontsize=6)
+    ax.set_xticks(tick_marks)
+    c = ax.set_xticklabels(classes, fontsize=3, rotation=-90, ha='center')
+    ax.xaxis.set_label_position('bottom')
+    ax.xaxis.tick_bottom()
+
+    ax.set_ylabel('True Label', fontsize=6)
+    ax.set_yticks(tick_marks)
+    ax.set_yticklabels(classes, fontsize=3, va='center')
+    ax.yaxis.set_label_position('left')
+    ax.yaxis.tick_left()
+
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        ax.text(j, i, format(cm[i, j], 'd') if cm[i, j] != 0 else '.', horizontalalignment="center", fontsize=4,
+                verticalalignment='center', color="black")
+    fig.set_tight_layout(True)
+    # fig.canvas.draw()
+    #
+    # # Now we can save it to a numpy array.
+    # data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    # data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+    return fig
+
+
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
     accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
     total_loss_meter = 0
     auc_meter_list = [torchnet.meter.AUCMeter() for _ in range(NUM_CLASSES)]
     auc_avg = torchnet.meter.AUCMeter()
+    average_precision = torchnet.meter.APMeter()
+    mean_squared_error = torchnet.meter.MSEMeter()
 
     for epoch in range(num_epochs):
         logger.info('-' * 60)
@@ -95,6 +137,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             for auc_meter in auc_meter_list:
                 auc_meter.reset()
             auc_avg.reset()
+            average_precision.reset()
+            mean_squared_error.reset()
             data_processed = 0
 
             if phase == 'train':
@@ -134,6 +178,13 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 total_loss_meter += float(loss.item()) * float(inputs.size(0))
                 confusion_matrix.add(outputs.data.squeeze(), labels.type(torch.LongTensor))
                 accuracy_meter.add(outputs.data, labels.data)
+                for ii in range(len(labels.data)):
+                    label = int(labels.data[ii])
+                    hot_one = [0] * NUM_CLASSES
+                    hot_one[label] = 1
+                    hot_one = np.array(hot_one)
+                    average_precision.add(outputs.data[ii], hot_one)
+
                 # auc meter
                 for ii in range(NUM_CLASSES):
                     targets = []
@@ -147,16 +198,25 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
             logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
             logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
-            logger.info('Confusion matrix:\n{}'.format(confusion_matrix.value()))
+            # logger.info('Confusion matrix:\n{}'.format(confusion_matrix.value()))
+
+            figure = plot_confusion_matrix(confusion_matrix.value(), all_classes)
+            # logger.info('Average Precision = \n{}'.format(average_precision.value()))
+            logger.info('Mean Average Precision = {:6.4f}'.format(float(average_precision.value().mean())))
 
             if phase == 'train':
                 writer.add_scalar('Train/Loss', epoch_loss, epoch)
                 writer.add_scalar('Train/Accuracy-top1', accuracy_meter.value(k=1), epoch)
                 writer.add_scalar('Train/Accuracy-top5', accuracy_meter.value(k=5), epoch)
+                writer.add_scalar('Train/Mean-Avg-Precision', float(average_precision.value().mean()), epoch)
+                # writer.add_image('Train/Confusion-Matrix', torch.from_numpy(figure), epoch)
+                writer.add_figure('Train/Confusion-Matrix', figure, epoch)
             elif phase == 'val':
                 writer.add_scalar('Val/Loss', epoch_loss, epoch)
                 writer.add_scalar('Val/Accuracy-top1', accuracy_meter.value(k=1), epoch)
                 writer.add_scalar('Val/Accuracy-top5', accuracy_meter.value(k=5), epoch)
+                writer.add_scalar('Val/Mean-Avg-Precision', float(average_precision.value().mean()), epoch)
+                writer.add_figure('Val/Confusion-Matrix', figure, epoch)
 
             # ROC curve
             if epoch % args.ROC_DRAWING == 0:
@@ -324,7 +384,7 @@ if __name__ == "__main__":
         os.mkdir(tensorboard_dir)
     writer = SummaryWriter(tensorboard_dir)
 
-    FREEZE_LAYERS_NUMBER = 6 + 16
+    FREEZE_LAYERS_NUMBER = 6+16
 
 
     def freeze_params(parameters):
@@ -397,6 +457,7 @@ if __name__ == "__main__":
         search_re = re.search(r'(n\d+-)(\w+)', idx_to_class[i], re.I)
         if search_re is not None:
             idx_to_class[i] = search_re.group(2)
+    all_classes = [idx_to_class[i] for i in range(NUM_CLASSES)]
     logger.info(idx_to_class)
 
     # check if can use GPU
