@@ -467,9 +467,6 @@ if __name__ == "__main__":
 
     # check if can use GPU
     device = torch.device("cuda" if torch.cuda.is_available() and not args.NOGPU else "cpu")
-    model_ft = model_ft.to(device)
-
-    criterion = nn.CrossEntropyLoss()
 
     # ------------------------------------------------------------------------------------------------------------------
     # Retrain whole network
@@ -478,6 +475,8 @@ if __name__ == "__main__":
     logger.info('PHASE ONE')
     logger.info('Retrain whole network')
     logger.info('-' * 90)
+
+    criterion = nn.CrossEntropyLoss()
 
     params_to_update = []
     for name, param in model_ft.named_parameters():
@@ -495,6 +494,8 @@ if __name__ == "__main__":
     logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
 
+    model_ft = model_ft.to(device)
+
     model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS)
     test_model_all(model_ft)
 
@@ -507,6 +508,8 @@ if __name__ == "__main__":
     logger.info('PHASE Two')
     logger.info('Reduce and retrain network')
     logger.info('-' * 90)
+
+    criterion = nn.CrossEntropyLoss()
 
     # reduce classifier to ONE Linear layer
     model_ft.classifier = nn.Sequential(*list(model_ft.classifier.children())[:-3])
@@ -539,6 +542,8 @@ if __name__ == "__main__":
     # Decay LR by a factor of x every y epochs
     logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
+
+    model_ft = model_ft.to(device)
 
     model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS)
     test_model_all(model_ft)
