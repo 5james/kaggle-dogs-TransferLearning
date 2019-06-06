@@ -115,7 +115,7 @@ def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
     return fig
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model_all(model, criterion, optimizer, scheduler, num_epochs=25):
     confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
     accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
     total_loss_meter = 0
@@ -259,6 +259,7 @@ def test_model(model):
     total_loss_meter = 0
     auc_meter_list = [torchnet.meter.AUCMeter() for _ in range(NUM_CLASSES)]
     auc_avg = torchnet.meter.AUCMeter()
+    average_precision = torchnet.meter.APMeter()
     data_processed = 0
 
     logger.info('-' * 60)
@@ -289,6 +290,12 @@ def test_model(model):
         total_loss_meter += float(loss.item()) * float(inputs.size(0))
         confusion_matrix.add(outputs.data.squeeze(), labels.type(torch.LongTensor))
         accuracy_meter.add(outputs.data, labels.data)
+        for ii in range(len(labels.data)):
+            label = int(labels.data[ii])
+            hot_one = [0] * NUM_CLASSES
+            hot_one[label] = 1
+            hot_one = np.array(hot_one)
+            average_precision.add(outputs.data[ii], hot_one)
         # auc meter
         for ii in range(NUM_CLASSES):
             targets = []
@@ -301,7 +308,10 @@ def test_model(model):
     logger.info('Epoch Loss / Dataset Len = {:6.4f}'.format(epoch_loss))
     logger.info('Epoch Accuracy Top1 = {:6.4f}'.format(accuracy_meter.value(k=1)))
     logger.info('Epoch Accuracy Top5 = {:6.4f}'.format(accuracy_meter.value(k=5)))
-    logger.info('Confusion matrix:\n{}'.format(confusion_matrix.value()))
+    figure = plot_confusion_matrix(confusion_matrix.value(), all_classes)
+    # logger.info('Confusion matrix:\n{}'.format(confusion_matrix.value()))
+    writer.add_figure('Test/Confusion-Matrix', figure, 0)
+    logger.info('Mean Average Precision = {:6.4f}'.format(float(average_precision.value().mean())))
 
     # ROC curve
     mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
@@ -384,7 +394,7 @@ if __name__ == "__main__":
         os.mkdir(tensorboard_dir)
     writer = SummaryWriter(tensorboard_dir)
 
-    FREEZE_LAYERS_NUMBER = 6+16
+    FREEZE_LAYERS_NUMBER = 6 + 16
 
 
     def freeze_params(parameters):
