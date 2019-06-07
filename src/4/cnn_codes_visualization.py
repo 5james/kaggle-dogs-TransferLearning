@@ -27,6 +27,37 @@ parser.add_argument("-p", "--pca_reduction", dest="PCA_REDUCTION", help="this nu
 
 args = parser.parse_args()
 
+
+class StreamToLogger(object):
+    """
+    Fake file-like stream object that redirects writes to a logger instance.
+    """
+
+    def __init__(self, logger, log_level=logging.INFO):
+        self.logger = logger
+        self.log_level = log_level
+        self.linebuf = ''
+
+    def write(self, buf):
+        for line in buf.rstrip().splitlines():
+            self.logger.log(self.log_level, line.rstrip())
+
+    def flush(self):
+        pass
+
+
+def chunk_it(seq, num):
+    avg = len(seq) / float(num)
+    out = []
+    last = 0.0
+
+    while last < len(seq):
+        out.append(seq[int(last):int(last + avg)])
+        last += avg
+
+    return out
+
+
 if __name__ == "__main__":
     args = parser.parse_args()
 
@@ -63,6 +94,11 @@ if __name__ == "__main__":
     # add the handlers to the logger
     logger.addHandler(fh)
     logger.addHandler(ch)
+    logger.info(args)
+
+    # for tsne print -> logger
+    sl = StreamToLogger(logger, logging.INFO)
+    sys.stdout = sl
     logger.info(args)
 
     # Find all h5 files
@@ -115,7 +151,10 @@ if __name__ == "__main__":
         for i in range(NUM_CLASSES):
             color = np.random.rand(3, 1)
             for single_point in range(len(points[i]['x'])):
-                plt.scatter(points[i]['x'][single_point], points[i]['y'][single_point], c=color)
+                x = points[i]['x'][single_point]
+                y = points[i]['y'][single_point]
+                print(x, y, end='\r')
+                plt.scatter(x, y, c=color)
         plt.legend()
         plt.savefig(filename + '.jpg')
         # plt.show()

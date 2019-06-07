@@ -337,7 +337,7 @@ def test_model_all(model, model_name):
     plotly.offline.plot({
         "data": traces,
         "layout": layout
-    }, auto_open=False, filename=EXPERIMENT_DIR + 'test.html')
+    }, auto_open=False, filename=EXPERIMENT_DIR + model_name + '-test.html')
 
     # # load best model weights
     # model.load_state_dict(best_model_wts)
