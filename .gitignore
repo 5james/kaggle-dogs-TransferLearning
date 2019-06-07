@@ -3,4 +3,5 @@ download
 .idea
 logs
 __pycache__
+*.h5
 

@@ -110,7 +110,7 @@ def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
     return fig
 
 
-def train_model_all(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model_all(model, criterion, optimizer, scheduler, num_epochs, model_name):
     confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
     accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
     total_loss_meter = 0
@@ -200,18 +200,20 @@ def train_model_all(model, criterion, optimizer, scheduler, num_epochs=25):
             logger.info('Mean Average Precision = {:6.4f}'.format(float(average_precision.value().mean())))
 
             if phase == 'train':
-                writer.add_scalar('Train/Loss', epoch_loss, epoch)
-                writer.add_scalar('Train/Accuracy-top1', accuracy_meter.value(k=1), epoch)
-                writer.add_scalar('Train/Accuracy-top5', accuracy_meter.value(k=5), epoch)
-                writer.add_scalar('Train/Mean-Avg-Precision', float(average_precision.value().mean()), epoch)
+                writer.add_scalar(model_name + '/Train/Loss', epoch_loss, epoch)
+                writer.add_scalar(model_name + '/Train/Accuracy-top1', accuracy_meter.value(k=1), epoch)
+                writer.add_scalar(model_name + '/Train/Accuracy-top5', accuracy_meter.value(k=5), epoch)
+                writer.add_scalar(model_name + '/Train/Mean-Avg-Precision', float(average_precision.value().mean()),
+                                  epoch)
                 # writer.add_image('Train/Confusion-Matrix', torch.from_numpy(figure), epoch)
-                writer.add_figure('Train/Confusion-Matrix', figure, epoch)
+                writer.add_figure(model_name + '/Train/Confusion-Matrix', figure, epoch)
             elif phase == 'val':
-                writer.add_scalar('Val/Loss', epoch_loss, epoch)
-                writer.add_scalar('Val/Accuracy-top1', accuracy_meter.value(k=1), epoch)
-                writer.add_scalar('Val/Accuracy-top5', accuracy_meter.value(k=5), epoch)
-                writer.add_scalar('Val/Mean-Avg-Precision', float(average_precision.value().mean()), epoch)
-                writer.add_figure('Val/Confusion-Matrix', figure, epoch)
+                writer.add_scalar(model_name + '/Val/Loss', epoch_loss, epoch)
+                writer.add_scalar(model_name + '/Val/Accuracy-top1', accuracy_meter.value(k=1), epoch)
+                writer.add_scalar(model_name + '/Val/Accuracy-top5', accuracy_meter.value(k=5), epoch)
+                writer.add_scalar(model_name + '/Val/Mean-Avg-Precision', float(average_precision.value().mean()),
+                                  epoch)
+                writer.add_figure(model_name + '/Val/Confusion-Matrix', figure, epoch)
 
             # ROC curve
             if epoch % args.ROC_DRAWING == 0:
@@ -241,14 +243,14 @@ def train_model_all(model, criterion, optimizer, scheduler, num_epochs=25):
                 plotly.offline.plot({
                     "data": traces,
                     "layout": layout
-                }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}.html'.format(epoch, phase))
+                }, auto_open=False, filename=EXPERIMENT_DIR + model_name + '-{}-{}.html'.format(epoch, phase))
 
     # # load best model weights
     # model.load_state_dict(best_model_wts)
     return model
 
 
-def test_model_all(model):
+def test_model_all(model, model_name):
     confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
     accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
     total_loss_meter = 0
@@ -496,8 +498,9 @@ if __name__ == "__main__":
 
     model_ft = model_ft.to(device)
 
-    model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS)
-    test_model_all(model_ft)
+    model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS,
+                               model_name='first')
+    test_model_all(model_ft, 'first')
 
     first_network = copy.deepcopy(model_ft)
 
@@ -545,8 +548,9 @@ if __name__ == "__main__":
 
     model_ft = model_ft.to(device)
 
-    model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS)
-    test_model_all(model_ft)
+    model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS,
+                               model_name='second')
+    test_model_all(model_ft, 'second')
 
     second_network = copy.deepcopy(model_ft)
 
