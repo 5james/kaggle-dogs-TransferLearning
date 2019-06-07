@@ -113,8 +113,9 @@ if __name__ == "__main__":
             points[y_training[i]]['x'].append(X_training_reduced_tsne[i, 0])
             points[y_training[i]]['y'].append(X_training_reduced_tsne[i, 1])
         for i in range(NUM_CLASSES):
-            color = list(np.random.choice(range(256), size=3))
-            plt.scatter(points[i]['x'], points[i]['y'], c=np.random.rand(5))
+            color = np.random.rand(3, 1)
+            for single_point in range(len(points[i]['x'])):
+                plt.scatter(points[i]['x'][single_point], points[i]['y'][single_point], c=color)
         plt.legend()
         plt.savefig(filename + '.jpg')
         # plt.show()
