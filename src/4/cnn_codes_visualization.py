@@ -101,30 +101,42 @@ if __name__ == "__main__":
     sys.stdout = sl
     logger.info(args)
 
-    # Find all h5 files
-    h5_files = []
-    for file in os.listdir(EXPERIMENT_DIR):
-        if file.endswith(".h5"):
-            h5_files.append(EXPERIMENT_DIR + file)
+    # # Find all h5 files
+    # h5_files = []
+    # for file in os.listdir(EXPERIMENT_DIR):
+    #     if file.endswith(".h5"):
+    #         h5_files.append(EXPERIMENT_DIR + file)
+    #
+    # # Find base of files
+    # h5_files_base = [x.replace('_X.h5', '').replace('_x.h5', '').replace('_Y.h5', '').replace('_y.h5', '')
+    #                  for x in h5_files]
+    # # Remove all duplicates
+    # h5_files_base = list(dict.fromkeys(h5_files_base))
 
-    # Find base of files
-    h5_files_base = [x.replace('_X.h5', '').replace('_x.h5', '').replace('_Y.h5', '').replace('_y.h5', '')
-                     for x in h5_files]
-    # Remove all duplicates
-    h5_files_base = list(dict.fromkeys(h5_files_base))
+    h5_files = [['first_cnn_codes_train'],
+                ['first_cnn_codes_test', 'first_cnn_codes_val'],
+                ['second_cnn_codes_train'],
+                ['second_cnn_codes_test', 'second_cnn_codes_val']]
 
     print('Start')
 
-    for filename in h5_files_base:
+    for h5_file in h5_files:
 
-        # Load files
-        f_X = tables.open_file(filename + '_X.h5', mode='r')
-        X_training = f_X.root.data.read()
-        f_X.close()
+        X_training_list = []
+        y_training_list = []
 
-        f_Y = tables.open_file(filename + '_y.h5', mode='r')
-        y_training = f_Y.root.data.read().squeeze()
-        f_Y.close()
+        for filename in h5_file:
+            # Load files
+            f_X = tables.open_file(filename + '_X.h5', mode='r')
+            X_training_list.append(f_X.root.data.read())
+            f_X.close()
+
+            f_Y = tables.open_file(filename + '_y.h5', mode='r')
+            y_training_list.append(f_Y.root.data.read().squeeze())
+            f_Y.close()
+
+        X_training = np.concatenate((X_training_list), axis=0)
+        y_training = np.concatenate((y_training_list), axis=0)
 
         # PCA algorithm at first to reduce number of dimensions.
         # https://github.com/rnoxy/cifar10-cnn/blob/master/Feature_extraction_with_fine_tuned_pretrained_ResNet50_using_keras.ipynb
@@ -149,7 +161,7 @@ if __name__ == "__main__":
             points[y_training[i]]['x'].append(X_training_reduced_tsne[i, 0])
             points[y_training[i]]['y'].append(X_training_reduced_tsne[i, 1])
         for i in range(NUM_CLASSES):
-            color = np.random.rand(3, 1)
+            color = np.random.rand(3, )
             for single_point in range(len(points[i]['x'])):
                 x = points[i]['x'][single_point]
                 y = points[i]['y'][single_point]
