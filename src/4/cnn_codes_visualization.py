@@ -127,11 +127,11 @@ if __name__ == "__main__":
 
         for filename in h5_file:
             # Load files
-            f_X = tables.open_file(filename + '_X.h5', mode='r')
+            f_X = tables.open_file(EXPERIMENT_DIR + filename + '_X.h5', mode='r')
             X_training_list.append(f_X.root.data.read())
             f_X.close()
 
-            f_Y = tables.open_file(filename + '_y.h5', mode='r')
+            f_Y = tables.open_file(EXPERIMENT_DIR + filename + '_y.h5', mode='r')
             y_training_list.append(f_Y.root.data.read().squeeze())
             f_Y.close()
 
