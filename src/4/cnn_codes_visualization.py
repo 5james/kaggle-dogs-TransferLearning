@@ -5,12 +5,15 @@ import matplotlib
 import matplotlib.pyplot as plt
 import os
 import sys
+import numpy as np
 import tables
 from argparse import ArgumentParser
 
 LOG_DIR = 'logs/'
 
 matplotlib.use('agg')
+
+NUM_CLASSES = 120
 
 parser = ArgumentParser()
 
@@ -102,21 +105,15 @@ if __name__ == "__main__":
         tsne = TSNE(n_components=2, verbose=3, n_iter=args.TSNE_ITERATIONS)
         X_training_reduced_tsne = tsne.fit_transform(X_training_reduced)
         logger.info('\tt-SNE fitting done.')
-        plt.figure(figsize=(15, 15))
+        plt.figure(figsize=(20, 20))
         # plt.scatter(X_training_reduced_tsne[:, 0], X_training_reduced_tsne[:, 1], c=y_training)
-        x_normal = []
-        y_normal = []
-        x_pneumonia = []
-        y_pneumonia = []
+
+        points = [{'x': [], 'y': []} for _ in range(NUM_CLASSES)]
         for i in range(len(y_training)):
-            if y_training[i] == 0:
-                x_normal.append(X_training_reduced_tsne[i, 0])
-                y_normal.append(X_training_reduced_tsne[i, 1])
-            else:
-                x_pneumonia.append(X_training_reduced_tsne[i, 0])
-                y_pneumonia.append(X_training_reduced_tsne[i, 1])
-        plt.scatter(x_normal, y_normal, c='blue', label='normal')
-        plt.scatter(x_pneumonia, y_pneumonia, c='red', label='pneumonia')
+            points[y_training[i]]['x'].append(X_training_reduced_tsne[i, 0])
+            points[y_training[i]]['y'].append(X_training_reduced_tsne[i, 1])
+        for i in range(NUM_CLASSES):
+            plt.scatter(points[i]['x'], points[i]['y'], c=np.random.rand(3, 1))
         plt.legend()
         plt.savefig(filename + '.jpg')
         # plt.show()
