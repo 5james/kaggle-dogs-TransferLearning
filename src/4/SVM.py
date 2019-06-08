@@ -10,7 +10,7 @@ from sklearn.metrics import roc_auc_score, roc_curve, auc
 import itertools
 from sklearn.metrics.pairwise import euclidean_distances
 import inspect
-
+import sys
 import plotly
 import plotly.graph_objs as go
 import matplotlib
@@ -38,6 +38,24 @@ parser = ArgumentParser()
 parser.add_argument("-e", "--experiment-dir", dest="EXPERIMENT_DIR", help="Pack whole experiment in one directory"
                                                                           "with predeclared filenames",
                     metavar="FILE", type=str, default=None)
+
+
+class StreamToLogger(object):
+    """
+    Fake file-like stream object that redirects writes to a logger instance.
+    """
+
+    def __init__(self, logger, log_level=logging.INFO):
+        self.logger = logger
+        self.log_level = log_level
+        self.linebuf = ''
+
+    def write(self, buf):
+        for line in buf.rstrip().splitlines():
+            self.logger.log(self.log_level, line.rstrip())
+
+    def flush(self):
+        pass
 
 
 def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
@@ -114,6 +132,11 @@ if __name__ == "__main__":
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
 
+    # for svm verbose
+    sl = StreamToLogger(logger, logging.INFO)
+    sys.stdout = sl
+    logger.info(args)
+
     # add the handlers to the logger
     logger.addHandler(fh)
     logger.addHandler(ch)
@@ -166,6 +189,7 @@ if __name__ == "__main__":
                                      degree=params['degree'],
                                      coef0=params['coef0'],
                                      probability=True,
+                                     verbose=True,
                                      random_state=np.random.RandomState(0))
             logger.info('Start training SVM with params: {}'.format(params))
             # Learn SVM on
@@ -292,3 +316,5 @@ if __name__ == "__main__":
                 "data": traces,
                 "layout": layout
             }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-test.html'.format(h5_file, idx))
+
+            logger.info('Ended testing new SVM on testing data')
