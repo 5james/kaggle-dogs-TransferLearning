@@ -14,6 +14,7 @@ import sys
 import plotly
 import plotly.graph_objs as go
 import matplotlib
+from sklearn.metrics import classification_report
 
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -25,6 +26,14 @@ matplotlib.use('agg')
 
 NUM_CLASSES = 120
 
+
+def top_n_accuracy(preds, target, n):
+    best_n = np.argsort(preds, axis=1)[:, -n:]
+    successes = 0
+    for i in range(len(target)):
+        if target[i] in best_n[i, :]:
+            successes += 1
+    return float(successes) / target.shape[0]
 
 def is_number(s):
     try:
@@ -150,15 +159,15 @@ if __name__ == "__main__":
 
     for h5_file in h5_files:
 
-        # Load train X data
-        f_X_train = tables.open_file(EXPERIMENT_DIR + h5_file + '_train_X.h5', mode='r')
-        X_training = f_X_train.root.data.read()
-        f_X_train.close()
-
-        # Load train y data
-        f_Y_train = tables.open_file(EXPERIMENT_DIR + h5_file + '_train_y.h5', mode='r')
-        y_training = f_Y_train.root.data.read().squeeze()
-        f_Y_train.close()
+        # # Load train X data
+        # f_X_train = tables.open_file(EXPERIMENT_DIR + h5_file + '_train_X.h5', mode='r')
+        # X_training = f_X_train.root.data.read()
+        # f_X_train.close()
+        #
+        # # Load train y data
+        # f_Y_train = tables.open_file(EXPERIMENT_DIR + h5_file + '_train_y.h5', mode='r')
+        # y_training = f_Y_train.root.data.read().squeeze()
+        # f_Y_train.close()
 
         # Load test X data
         f_X_test_1 = tables.open_file(EXPERIMENT_DIR + h5_file + '_test_X.h5', mode='r')
@@ -178,6 +187,26 @@ if __name__ == "__main__":
         f_Y_test_2.close()
         y_test = np.concatenate((y_test_1, y_test_2), axis=0)
 
+        # TODO TESTING -------------------------------------------------------------------------------------------------
+        # Load test X data
+        f_X_test_1 = tables.open_file(EXPERIMENT_DIR + h5_file + '_test_X.h5', mode='r')
+        x_test_1 = f_X_test_1.root.data.read()
+        f_X_test_1.close()
+        f_X_test_2 = tables.open_file(EXPERIMENT_DIR + h5_file + '_val_X.h5', mode='r')
+        x_test_2 = f_X_test_2.root.data.read()
+        f_X_test_2.close()
+        X_training = np.concatenate((x_test_1, x_test_2), axis=0)
+
+        # Load test y data
+        f_Y_test_1 = tables.open_file(EXPERIMENT_DIR + h5_file + '_test_y.h5', mode='r')
+        y_test_1 = f_Y_test_1.root.data.read().squeeze()
+        f_Y_test_1.close()
+        f_Y_test_2 = tables.open_file(EXPERIMENT_DIR + h5_file + '_val_y.h5', mode='r')
+        y_test_2 = f_Y_test_2.root.data.read().squeeze()
+        f_Y_test_2.close()
+        y_training = np.concatenate((y_test_1, y_test_2), axis=0)
+        # TODO TESTING -------------------------------------------------------------------------------------------------
+
         testing_parameters = [{'kernel': 'linear', 'degree': 3, 'coef0': 0.0},
                               {'kernel': 'poly', 'degree': 2, 'coef0': 0.0},
                               {'kernel': quadraticKernel, 'degree': 2, 'coef0': 0.0},
@@ -190,6 +219,7 @@ if __name__ == "__main__":
                                      coef0=params['coef0'],
                                      probability=True,
                                      verbose=True,
+                                     cache_size=500,
                                      random_state=np.random.RandomState(0))
             logger.info('Start training SVM with params: {}'.format(params))
             # Learn SVM on
@@ -208,6 +238,11 @@ if __name__ == "__main__":
             logger.info('Confusion matrix:\n' + str(confusion_matrix))
             fig = plot_confusion_matrix(confusion_matrix, classes_num)
             plt.savefig(EXPERIMENT_DIR + h5_file + '_train.jpg')
+            # report
+            logger.info(classification_report(y_training, y_training_prediction))
+            # top5 accuracy
+            top5 = top_n_accuracy(y_training_proba, y_training, 5)
+            logger.info('Top5 accuray = {:.2f}'.format(top5))
             # Compute ROC curve and ROC area for each class
             mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
                                   mode='lines',
@@ -270,6 +305,11 @@ if __name__ == "__main__":
             logger.info('Confusion matrix:\n' + str(confusion_matrix))
             fig = plot_confusion_matrix(confusion_matrix, classes_num)
             plt.savefig(EXPERIMENT_DIR + h5_file + '_test.jpg')
+            # report
+            logger.info(classification_report(y_test, y_testing_prediction))
+            # top5 accuracy
+            top5 = top_n_accuracy(y_testing_proba, y_test, 5)
+            logger.info('Top5 accuray = {:.2f}'.format(top5))
             # Compute ROC curve and ROC area for each class
             mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
                                   mode='lines',
