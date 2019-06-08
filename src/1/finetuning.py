@@ -115,7 +115,7 @@ def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
     return fig
 
 
-def train_model_all(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
     accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
     total_loss_meter = 0
@@ -223,7 +223,7 @@ def train_model_all(model, criterion, optimizer, scheduler, num_epochs=25):
                 mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
                                       mode='lines',
                                       line=dict(color='navy', width=2, dash='dash'),
-                                      showlegend=False)
+                                      name='Mid-lane')
                 auc, tpr, fpr = auc_avg.value()
                 avg_lane = go.Scatter(x=fpr, y=tpr,
                                       mode='lines',
@@ -317,7 +317,7 @@ def test_model(model):
     mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
                           mode='lines',
                           line=dict(color='navy', width=2, dash='dash'),
-                          showlegend=False)
+                          name='Mid-lane')
     auc, tpr, fpr = auc_avg.value()
     avg_lane = go.Scatter(x=fpr, y=tpr,
                           mode='lines',

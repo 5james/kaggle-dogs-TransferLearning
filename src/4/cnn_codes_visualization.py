@@ -165,7 +165,7 @@ if __name__ == "__main__":
             for single_point in range(len(points[i]['x'])):
                 x = points[i]['x'][single_point]
                 y = points[i]['y'][single_point]
-                print(x, y, end='\r')
+                # print(x, y, end='\r')
                 plt.scatter(x, y, c=color)
         plt.legend()
         plt.savefig(EXPERIMENT_DIR + h5_file[0] + '.jpg')
