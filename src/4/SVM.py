@@ -1,19 +1,12 @@
 import logging
-import pickle
 import tables
 from sklearn import svm, metrics
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 import numpy as np
 from argparse import ArgumentParser
-import torch.nn as nn
-import torch
-import torchvision
-from torch.autograd import Variable
 import os
 import random
-from torch.utils.data import DataLoader, sampler, random_split, ConcatDataset
 from sklearn.metrics import roc_auc_score, roc_curve, auc
-from torchvision import datasets, models, transforms
 import itertools
 from sklearn.metrics.pairwise import euclidean_distances
 import inspect
@@ -127,9 +120,6 @@ if __name__ == "__main__":
     logger.info('-' * 90)
     logger.info(args)
     logger.info('-' * 90)
-
-    # check if gpu available
-    use_gpu = torch.cuda.is_available() and not args.NOGPU
 
     h5_files = ['first_cnn_codes', 'second_cnn_codes']
 
@@ -302,4 +292,3 @@ if __name__ == "__main__":
                 "data": traces,
                 "layout": layout
             }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-test.html'.format(h5_file, idx))
-           
