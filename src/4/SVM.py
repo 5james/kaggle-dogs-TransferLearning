@@ -11,6 +11,7 @@ import itertools
 from sklearn.metrics.pairwise import euclidean_distances
 import inspect
 import sys
+import thundersvm
 import plotly
 import plotly.graph_objs as go
 import matplotlib
@@ -34,6 +35,7 @@ def top_n_accuracy(preds, target, n):
         if target[i] in best_n[i, :]:
             successes += 1
     return float(successes) / target.shape[0]
+
 
 def is_number(s):
     try:
@@ -207,20 +209,20 @@ if __name__ == "__main__":
         y_training = np.concatenate((y_test_1, y_test_2), axis=0)
         # TODO TESTING -------------------------------------------------------------------------------------------------
 
-        testing_parameters = [{'kernel': 'linear', 'degree': 3, 'coef0': 0.0},
-                              {'kernel': 'poly', 'degree': 2, 'coef0': 0.0},
-                              {'kernel': quadraticKernel, 'degree': 2, 'coef0': 0.0},
+        testing_parameters = [{'kernel': quadraticKernel, 'degree': 2, 'coef0': 0.0},
+                              {'kernel': 'linear', 'degree': 3, 'coef0': 0.0},
+                              # {'kernel': 'poly', 'degree': 2, 'coef0': 0.0},
                               {'kernel': 'poly', 'degree': 3, 'coef0': 0.0}]
 
         for idx, params in enumerate(testing_parameters):
             # Create new SVM
-            svm_classifier = svm.SVC(kernel=params['kernel'],
-                                     degree=params['degree'],
-                                     coef0=params['coef0'],
-                                     probability=True,
-                                     verbose=True,
-                                     cache_size=500,
-                                     random_state=np.random.RandomState(0))
+            svm_classifier = thundersvm.SVC(kernel=params['kernel'],
+                                            degree=params['degree'],
+                                            coef0=params['coef0'],
+                                            probability=True,
+                                            verbose=True,
+                                            cache_size=500,
+                                            random_state=np.random.RandomState(0))
             logger.info('Start training SVM with params: {}'.format(params))
             # Learn SVM on
             svm_classifier.fit(X_training, y_training)
