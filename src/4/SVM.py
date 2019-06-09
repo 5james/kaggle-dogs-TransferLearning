@@ -202,7 +202,7 @@ if __name__ == "__main__":
         logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
         logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
 
-        tsne = TSNE(n_components=args.SHAPE, verbose=3, n_iter=args.TSNE_ITERATIONS)
+        tsne = TSNE(n_components=args.SHAPE, verbose=3, n_iter=args.TSNE_ITERATIONS, method='exact')
         X_training = tsne.fit_transform(X_training)
         X_test = tsne.fit_transform(X_test)
 
