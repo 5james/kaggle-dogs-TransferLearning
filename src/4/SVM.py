@@ -11,11 +11,12 @@ import itertools
 from sklearn.metrics.pairwise import euclidean_distances
 import inspect
 import sys
-import thundersvm
+# import thundersvm
 import plotly
 import plotly.graph_objs as go
 import matplotlib
 from sklearn.metrics import classification_report
+from sklearn.manifold import TSNE
 
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -49,6 +50,11 @@ parser = ArgumentParser()
 parser.add_argument("-e", "--experiment-dir", dest="EXPERIMENT_DIR", help="Pack whole experiment in one directory"
                                                                           "with predeclared filenames",
                     metavar="FILE", type=str, default=None)
+parser.add_argument("-s", "--shape", dest="SHAPE", help="To how many dimensions reduce single CNN code.",
+                    type=int, default=10000)
+parser.add_argument("-t", "--tsne_iterations", dest="TSNE_ITERATIONS", help="number of iterations in tsne.",
+                    type=int, default=3000)
+
 
 
 class StreamToLogger(object):
@@ -161,15 +167,15 @@ if __name__ == "__main__":
 
     for h5_file in h5_files:
 
-        # # Load train X data
-        # f_X_train = tables.open_file(EXPERIMENT_DIR + h5_file + '_train_X.h5', mode='r')
-        # X_training = f_X_train.root.data.read()
-        # f_X_train.close()
-        #
-        # # Load train y data
-        # f_Y_train = tables.open_file(EXPERIMENT_DIR + h5_file + '_train_y.h5', mode='r')
-        # y_training = f_Y_train.root.data.read().squeeze()
-        # f_Y_train.close()
+        # Load train X data
+        f_X_train = tables.open_file(EXPERIMENT_DIR + h5_file + '_train_X.h5', mode='r')
+        X_training = f_X_train.root.data.read()
+        f_X_train.close()
+
+        # Load train y data
+        f_Y_train = tables.open_file(EXPERIMENT_DIR + h5_file + '_train_y.h5', mode='r')
+        y_training = f_Y_train.root.data.read().squeeze()
+        f_Y_train.close()
 
         # Load test X data
         f_X_test_1 = tables.open_file(EXPERIMENT_DIR + h5_file + '_test_X.h5', mode='r')
@@ -189,26 +195,18 @@ if __name__ == "__main__":
         f_Y_test_2.close()
         y_test = np.concatenate((y_test_1, y_test_2), axis=0)
 
-        # TODO TESTING -------------------------------------------------------------------------------------------------
-        # Load test X data
-        f_X_test_1 = tables.open_file(EXPERIMENT_DIR + h5_file + '_test_X.h5', mode='r')
-        x_test_1 = f_X_test_1.root.data.read()
-        f_X_test_1.close()
-        f_X_test_2 = tables.open_file(EXPERIMENT_DIR + h5_file + '_val_X.h5', mode='r')
-        x_test_2 = f_X_test_2.root.data.read()
-        f_X_test_2.close()
-        X_training = np.concatenate((x_test_1, x_test_2), axis=0)
+        # Reducing dimensions
+        logger.info('Before:')
+        logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
+        logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
+        logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
+        logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
 
-        # Load test y data
-        f_Y_test_1 = tables.open_file(EXPERIMENT_DIR + h5_file + '_test_y.h5', mode='r')
-        y_test_1 = f_Y_test_1.root.data.read().squeeze()
-        f_Y_test_1.close()
-        f_Y_test_2 = tables.open_file(EXPERIMENT_DIR + h5_file + '_val_y.h5', mode='r')
-        y_test_2 = f_Y_test_2.root.data.read().squeeze()
-        f_Y_test_2.close()
-        y_training = np.concatenate((y_test_1, y_test_2), axis=0)
-        # TODO TESTING -------------------------------------------------------------------------------------------------
+        tsne = TSNE(n_components=args.SHAPE, verbose=3, n_iter=args.TSNE_ITERATIONS)
+        X_training = tsne.fit_transform(X_training)
+        X_test = tsne.fit_transform(X_test)
 
+        logger.info('After:')
         logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
         logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
         logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
@@ -221,7 +219,7 @@ if __name__ == "__main__":
 
         for idx, params in enumerate(testing_parameters):
             # Create new SVM
-            svm_classifier = thundersvm.SVC(kernel=params['kernel'],
+            svm_classifier = svm.SVC(kernel=params['kernel'],
                                             degree=params['degree'],
                                             coef0=params['coef0'],
                                             probability=True,
