@@ -11,7 +11,7 @@ import itertools
 from sklearn.metrics.pairwise import euclidean_distances
 import inspect
 import sys
-# import thundersvm
+import thundersvm
 import plotly
 import plotly.graph_objs as go
 import matplotlib
@@ -51,11 +51,13 @@ parser = ArgumentParser()
 parser.add_argument("-e", "--experiment-dir", dest="EXPERIMENT_DIR", help="Pack whole experiment in one directory"
                                                                           "with predeclared filenames",
                     metavar="FILE", type=str, default=None)
-parser.add_argument("-t", "--tsne_iterations", dest="TSNE_ITERATIONS", help="number of iterations in tsne.",
-                    type=int, default=3000)
-parser.add_argument("-p", "--pca_reduction", dest="PCA_REDUCTION", help="this number specify to how many dimensions"
-                                                                        "pca will reduce.",
-                    type=int, default=500)
+
+
+# parser.add_argument("-t", "--tsne_iterations", dest="TSNE_ITERATIONS", help="number of iterations in tsne.",
+#                     type=int, default=3000)
+# parser.add_argument("-p", "--pca_reduction", dest="PCA_REDUCTION", help="this number specify to how many dimensions"
+#                                                                         "pca will reduce.",
+#                     type=int, default=500)
 
 
 class StreamToLogger(object):
@@ -196,29 +198,29 @@ if __name__ == "__main__":
         f_Y_test_2.close()
         y_test = np.concatenate((y_test_1, y_test_2), axis=0)
 
-        # Reducing dimensions
-        logger.info('Before:')
-        logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
-        logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
-        logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
-        logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
-
-        logger.info('Start PCA')
-        pca = PCA(n_components=args.PCA_REDUCTION)
-        X_training = pca.fit_transform(X_training)
-        X_test = pca.fit_transform(X_test)
-        logger.info('Ended PCA')
-        logger.info('Start t-SNE')
-        tsne = TSNE(n_components=3, verbose=3, n_iter=args.TSNE_ITERATIONS)
-        X_training = tsne.fit_transform(X_training)
-        X_test = tsne.fit_transform(X_test)
-        logger.info('Ended t-SNE')
-
-        logger.info('After:')
-        logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
-        logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
-        logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
-        logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
+        # # Reducing dimensions
+        # logger.info('Before:')
+        # logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
+        # logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
+        # logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
+        # logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
+        #
+        # logger.info('Start PCA')
+        # pca = PCA(n_components=args.PCA_REDUCTION)
+        # X_training = pca.fit_transform(X_training)
+        # X_test = pca.fit_transform(X_test)
+        # logger.info('Ended PCA')
+        # logger.info('Start t-SNE')
+        # tsne = TSNE(n_components=3, verbose=3, n_iter=args.TSNE_ITERATIONS)
+        # X_training = tsne.fit_transform(X_training)
+        # X_test = tsne.fit_transform(X_test)
+        # logger.info('Ended t-SNE')
+        #
+        # logger.info('After:')
+        # logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
+        # logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
+        # logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
+        # logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
 
         testing_parameters = [{'kernel': quadraticKernel, 'degree': 2, 'coef0': 0.0},
                               {'kernel': 'linear', 'degree': 3, 'coef0': 0.0},
@@ -227,13 +229,13 @@ if __name__ == "__main__":
 
         for idx, params in enumerate(testing_parameters):
             # Create new SVM
-            svm_classifier = svm.SVC(kernel=params['kernel'],
-                                     degree=params['degree'],
-                                     coef0=params['coef0'],
-                                     probability=True,
-                                     verbose=True,
-                                     cache_size=500,
-                                     random_state=np.random.RandomState(0))
+            svm_classifier = thundersvm.SVC(kernel=params['kernel'],
+                                            degree=params['degree'],
+                                            coef0=params['coef0'],
+                                            probability=True,
+                                            verbose=True,
+                                            cache_size=500,
+                                            random_state=np.random.RandomState(0))
             logger.info('Start training SVM with params: {}'.format(params))
             # Learn SVM on
             svm_classifier.fit(X_training, y_training)

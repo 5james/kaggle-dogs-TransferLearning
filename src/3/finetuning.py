@@ -537,10 +537,10 @@ if __name__ == "__main__":
             logger.info("\t{}".format(name))
 
     logger.info('SGD: lr = {};  momentum = {}, weight decay = {}'.format(
-        args.LEARNING_RATE, 0, args.WEIGHT_DECAY))
+        args.LEARNING_RATE, 0, 0))
 
     optimizer_ft = optim.SGD(params_to_update, lr=args.LEARNING_RATE, momentum=0,
-                             weight_decay=args.WEIGHT_DECAY)
+                             weight_decay=0)
 
     # Decay LR by a factor of x every y epochs
     logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
