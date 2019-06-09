@@ -492,6 +492,6 @@ if __name__ == "__main__":
     logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
 
-    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
+    model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
                            num_epochs=args.EPOCHS)
     test_model(model_ft)
