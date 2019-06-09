@@ -209,6 +209,11 @@ if __name__ == "__main__":
         y_training = np.concatenate((y_test_1, y_test_2), axis=0)
         # TODO TESTING -------------------------------------------------------------------------------------------------
 
+        logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
+        logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
+        logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
+        logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
+
         testing_parameters = [{'kernel': quadraticKernel, 'degree': 2, 'coef0': 0.0},
                               {'kernel': 'linear', 'degree': 3, 'coef0': 0.0},
                               # {'kernel': 'poly', 'degree': 2, 'coef0': 0.0},
