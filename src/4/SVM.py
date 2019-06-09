@@ -17,6 +17,7 @@ import plotly.graph_objs as go
 import matplotlib
 from sklearn.metrics import classification_report
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -54,7 +55,6 @@ parser.add_argument("-s", "--shape", dest="SHAPE", help="To how many dimensions 
                     type=int, default=10000)
 parser.add_argument("-t", "--tsne_iterations", dest="TSNE_ITERATIONS", help="number of iterations in tsne.",
                     type=int, default=3000)
-
 
 
 class StreamToLogger(object):
@@ -202,9 +202,12 @@ if __name__ == "__main__":
         logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
         logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
 
-        tsne = TSNE(n_components=args.SHAPE, verbose=3, n_iter=args.TSNE_ITERATIONS, method='exact')
-        X_training = tsne.fit_transform(X_training)
-        X_test = tsne.fit_transform(X_test)
+        # tsne = TSNE(n_components=args.SHAPE, verbose=3, n_iter=args.TSNE_ITERATIONS, method='exact')
+        # X_training = tsne.fit_transform(X_training)
+        # X_test = tsne.fit_transform(X_test)
+        pca = PCA(n_components=args.SHAPE)
+        X_training = pca.fit_transform(X_training)
+        X_test = pca.fit_transform(X_test)
 
         logger.info('After:')
         logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
@@ -220,12 +223,12 @@ if __name__ == "__main__":
         for idx, params in enumerate(testing_parameters):
             # Create new SVM
             svm_classifier = svm.SVC(kernel=params['kernel'],
-                                            degree=params['degree'],
-                                            coef0=params['coef0'],
-                                            probability=True,
-                                            verbose=True,
-                                            cache_size=500,
-                                            random_state=np.random.RandomState(0))
+                                     degree=params['degree'],
+                                     coef0=params['coef0'],
+                                     probability=True,
+                                     verbose=True,
+                                     cache_size=500,
+                                     random_state=np.random.RandomState(0))
             logger.info('Start training SVM with params: {}'.format(params))
             # Learn SVM on
             svm_classifier.fit(X_training, y_training)
