@@ -17,7 +17,7 @@ import plotly.graph_objs as go
 import matplotlib
 from sklearn.metrics import classification_report
 from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, SparsePCA
 
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -57,6 +57,8 @@ parser.add_argument("-t", "--tsne_iterations", dest="TSNE_ITERATIONS", help="num
 parser.add_argument("-p", "--pca_reduction", dest="PCA_REDUCTION", help="this number specify to how many dimensions"
                                                                         "pca will reduce.",
                     type=int, default=15000)
+parser.add_argument("-nj", "--n_jobs", dest="N_JOBS", help="number of threads used.",
+                    type=int, default=16)
 
 
 class StreamToLogger(object):
@@ -205,7 +207,7 @@ if __name__ == "__main__":
         logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
 
         logger.info('Start PCA')
-        pca = PCA(n_components=args.PCA_REDUCTION)
+        pca = SparsePCA(n_components=args.PCA_REDUCTION, verbose=True, n_jobs=args.N_JOBS)
         X_training = pca.fit_transform(X_training)
         X_test = pca.fit_transform(X_test)
         logger.info('Ended PCA')
