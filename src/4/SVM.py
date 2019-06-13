@@ -11,7 +11,7 @@ import itertools
 from sklearn.metrics.pairwise import euclidean_distances
 import inspect
 import sys
-import thundersvm
+# import thundersvm
 import plotly
 import plotly.graph_objs as go
 import matplotlib
@@ -59,6 +59,9 @@ parser.add_argument("-p", "--pca_reduction", dest="PCA_REDUCTION", help="this nu
                     type=int, default=15000)
 parser.add_argument("-nj", "--n_jobs", dest="N_JOBS", help="number of threads used.",
                     type=int, default=16)
+parser.add_argument("-d", "-divide", dest="DIVIDE", help="On how many sets of classes should CNN codes be divided"
+                                                         " (RAM problem). There are 120 classes total.",
+                    type=int, default=3)
 
 
 class StreamToLogger(object):
@@ -171,6 +174,8 @@ if __name__ == "__main__":
 
     for h5_file in h5_files:
 
+        logger.info('Analyzing {}'.format(h5_file))
+
         # Load train X data
         f_X_train = tables.open_file(EXPERIMENT_DIR + h5_file + '_train_X.h5', mode='r')
         X_training = f_X_train.root.data.read()
@@ -199,178 +204,227 @@ if __name__ == "__main__":
         f_Y_test_2.close()
         y_test = np.concatenate((y_test_1, y_test_2), axis=0)
 
-        # Reducing dimensions
-        logger.info('Before:')
-        logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
-        logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
-        logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
-        logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
-
-        logger.info('Start PCA')
-        pca = SparsePCA(n_components=args.PCA_REDUCTION, verbose=True, n_jobs=args.N_JOBS)
-        X_training = pca.fit_transform(X_training)
-        X_test = pca.fit_transform(X_test)
-        logger.info('Ended PCA')
+        # # Reducing dimensions
+        # logger.info('Before:')
+        # logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
+        # logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
+        # logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
+        # logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
+        #
+        # logger.info('Start PCA')
+        # pca = SparsePCA(n_components=args.PCA_REDUCTION, verbose=True, n_jobs=args.N_JOBS)
+        # X_training = pca.fit_transform(X_training)
+        # X_test = pca.fit_transform(X_test)
+        # logger.info('Ended PCA')
         # logger.info('Start t-SNE')
         # tsne = TSNE(n_components=3, verbose=3, n_iter=args.TSNE_ITERATIONS)
         # X_training = tsne.fit_transform(X_training)
         # X_test = tsne.fit_transform(X_test)
         # logger.info('Ended t-SNE')
-
-        logger.info('After:')
+        #
+        # logger.info('After:')
         logger.info('Training CNN Codes X shape: {}'.format(X_training.shape))
         logger.info('Training CNN Codes y shape: {}'.format(y_training.shape))
         logger.info('Testing CNN Codes X shape: {}'.format(X_test.shape))
         logger.info('Testing CNN Codes y shape: {}'.format(y_test.shape))
+
+        mapping_idx_y_training = [[] for _ in range(120)]
+        mapping_idx_y_val = [[] for _ in range(120)]
+
+        for idx, label in enumerate(y_training):
+            mapping_idx_y_training[label].append(idx)
+        for idx, label in enumerate(y_test):
+            mapping_idx_y_val[label].append(idx)
 
         testing_parameters = [{'kernel': quadraticKernel, 'degree': 2, 'coef0': 0.0},
                               {'kernel': 'linear', 'degree': 3, 'coef0': 0.0},
                               {'kernel': 'poly', 'degree': 2, 'coef0': 0.0},
                               {'kernel': 'poly', 'degree': 3, 'coef0': 0.0}]
 
+        classes_in_subset = int(NUM_CLASSES / args.DIVIDE)
+
         for idx, params in enumerate(testing_parameters):
-            # Create new SVM
-            svm_classifier = svm.SVC(kernel=params['kernel'],
-                                     degree=params['degree'],
-                                     coef0=params['coef0'],
-                                     probability=True,
-                                     verbose=True,
-                                     cache_size=500,
-                                     random_state=np.random.RandomState(0))
             logger.info('Start training SVM with params: {}'.format(params))
-            # Learn SVM on
-            svm_classifier.fit(X_training, y_training)
-            logger.info('Ended training SVM')
+            avg_y_per_parameter = []
+            avg_y_proba_per_parameter = []
+            for subset_index in range(args.DIVIDE):
+                logger.info('Training {}/{} subset'.format(subset_index, args.DIVIDE - 1))
 
-            logger.info('Start testing SVM on training data')
+                # Create subsets
+                all_indexes_in_subset_training = np.concatenate(
+                    mapping_idx_y_training[subset_index * classes_in_subset:(subset_index + 1) * classes_in_subset])
 
-            y_training_prediction = svm_classifier.predict(X_training)
-            y_training_proba = svm_classifier.predict_proba(X_training)
+                X_training_subset = np.vstack([X_training[tmp] for tmp in all_indexes_in_subset_training])
+                y_training_subset = np.vstack([y_training[tmp] for tmp in all_indexes_in_subset_training])
+                X_test_subset = np.vstack([X_test[tmp] for tmp in all_indexes_in_subset_training])
+                y_test_subset = np.vstack([y_test[tmp] for tmp in all_indexes_in_subset_training])
+                logger.info('Training CNN Codes X subset shape: {}'.format(X_training_subset.shape))
+                logger.info('Training CNN Codes y subset shape: {}'.format(y_training_subset.shape))
+                logger.info('Testing CNN Codes X subset shape: {}'.format(X_test_subset.shape))
+                logger.info('Testing CNN Codes y subset shape: {}'.format(y_test_subset.shape))
 
-            # Step statistics - confusion matrix + ROC
-            # confusion matrix
-            confusion_matrix = metrics.confusion_matrix(y_true=y_training, y_pred=y_training_prediction)
-            classes_num = [str(x) for x in range(NUM_CLASSES)]
-            logger.info('Confusion matrix:\n' + str(confusion_matrix))
-            fig = plot_confusion_matrix(confusion_matrix, classes_num)
-            plt.savefig(EXPERIMENT_DIR + h5_file + '_train.jpg')
-            # report
-            logger.info(classification_report(y_training, y_training_prediction))
-            # top5 accuracy
-            top5 = top_n_accuracy(y_training_proba, y_training, 5)
-            logger.info('Top5 accuray = {:.2f}'.format(top5))
-            # Compute ROC curve and ROC area for each class
-            mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
-                                  mode='lines',
-                                  line=dict(color='navy', width=2, dash='dash'),
-                                  name='Mid-lane')
-            # auc, tpr, fpr = auc_avg.value()
-            # avg_lane = go.Scatter(x=fpr, y=tpr,
-            #                       mode='lines',
-            #                       line=dict(color='deeppink', width=1, dash='dot'),
-            #                       name='average ROC curve (area = {:.2f})'.format(float(auc)))
-            traces = [mid_lane]
-            avg_y = []
-            avg_y_proba = []
-            for current_class in range(NUM_CLASSES):
-                current_class_y_training = []
-                for jj in y_training:
-                    current_class_y_training.append(1 if int(jj) == current_class else 0)
-                fpr, tpr, threshold = roc_curve(current_class_y_training, y_training_proba[:, current_class])
+                # Create new SVM
+                svm_classifier = svm.SVC(kernel=params['kernel'],
+                                         degree=params['degree'],
+                                         coef0=params['coef0'],
+                                         probability=True,
+                                         verbose=True,
+                                         cache_size=250,
+                                         random_state=np.random.RandomState(0))
+                # Learn SVM on subset
+                svm_classifier.fit(X_training_subset, y_training_subset)
+                logger.info('Ended training SVM')
+
+                logger.info('Start testing SVM on training data')
+
+                y_training_prediction = svm_classifier.predict(X_training_subset)
+                y_training_proba = svm_classifier.predict_proba(X_training_subset)
+
+                # Step statistics - confusion matrix + ROC
+                # confusion matrix
+                confusion_matrix = metrics.confusion_matrix(y_true=y_training_subset, y_pred=y_training_prediction)
+                classes_num = [str(x) for x in range(NUM_CLASSES)]
+                logger.info('Confusion matrix:\n' + str(confusion_matrix))
+                fig = plot_confusion_matrix(confusion_matrix, classes_num)
+                plt.savefig(EXPERIMENT_DIR + h5_file + '_train.jpg')
+                # report
+                logger.info(classification_report(y_training_subset, y_training_prediction))
+                # top5 accuracy
+                top5 = top_n_accuracy(y_training_proba, y_training_subset, 5)
+                logger.info('Top5 accuray = {:.2f}'.format(top5))
+                # Compute ROC curve and ROC area for each class
+                mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
+                                      mode='lines',
+                                      line=dict(color='navy', width=2, dash='dash'),
+                                      name='Mid-lane')
+                # auc, tpr, fpr = auc_avg.value()
+                # avg_lane = go.Scatter(x=fpr, y=tpr,
+                #                       mode='lines',
+                #                       line=dict(color='deeppink', width=1, dash='dot'),
+                #                       name='average ROC curve (area = {:.2f})'.format(float(auc)))
+                traces = [mid_lane]
+                avg_y = []
+                avg_y_proba = []
+                for current_class in range(NUM_CLASSES):
+                    current_class_y_training = []
+                    for jj in y_training_subset:
+                        current_class_y_training.append(1 if int(jj) == current_class else 0)
+                    fpr, tpr, threshold = roc_curve(current_class_y_training, y_training_proba[:, current_class])
+                    roc_auc = auc(fpr, tpr)
+                    color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255),
+                                                     random.randint(0, 255))
+                    trace = go.Scatter(x=fpr, y=tpr,
+                                       mode='lines',
+                                       line=dict(color=color, width=1),
+                                       name='{} (area = {:.2f})'.format(classes_num[current_class], float(roc_auc))
+                                       )
+                    traces.append(trace)
+                    # Add to average
+                    avg_y.append(current_class_y_training)
+                    avg_y_proba.append(y_training_proba[:, current_class])
+
+                avg_y = np.concatenate((avg_y), axis=0)
+                avg_y_proba = np.concatenate((avg_y_proba), axis=0)
+                fpr, tpr, threshold = roc_curve(avg_y, avg_y_proba)
                 roc_auc = auc(fpr, tpr)
-                color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                trace = go.Scatter(x=fpr, y=tpr,
-                                   mode='lines',
-                                   line=dict(color=color, width=1),
-                                   name='{} (area = {:.2f})'.format(classes_num[current_class], float(roc_auc))
-                                   )
-                traces.append(trace)
-                # Add to average
-                avg_y.append(current_class_y_training)
-                avg_y_proba.append(y_training_proba[:, current_class])
+                avg_lane = go.Scatter(x=fpr, y=tpr,
+                                      mode='lines',
+                                      line=dict(color='deeppink', width=1, dash='dot'),
+                                      name='average ROC curve (area = {:.2f})'.format(float(roc_auc)))
+                traces.append(avg_lane)
+                layout = go.Layout(title='Receiver operating characteristic',
+                                   xaxis=dict(title='False Positive Rate'),
+                                   yaxis=dict(title='True Positive Rate'))
+                plotly.offline.plot({
+                    "data": traces,
+                    "layout": layout
+                }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-train.html'.format(h5_file, idx))
 
-            avg_y = np.concatenate((avg_y), axis=0)
-            avg_y_proba = np.concatenate((avg_y_proba), axis=0)
-            fpr, tpr, threshold = roc_curve(avg_y, avg_y_proba)
+                logger.info('Ended testing new SVM on training data')
+
+                # ----------------------------------------------------------------------------------------------------------
+                logger.info('Start testing new SVM on testing data')
+
+                y_testing_prediction = svm_classifier.predict(X_test_subset)
+                y_testing_proba = svm_classifier.predict_proba(X_test_subset)
+
+                # Step statistics - confusion matrix + ROC
+                # confusion matrix
+                confusion_matrix = metrics.confusion_matrix(y_true=y_test_subset, y_pred=y_testing_prediction)
+                classes_num = [str(x) for x in range(NUM_CLASSES)]
+                logger.info('Confusion matrix:\n' + str(confusion_matrix))
+                fig = plot_confusion_matrix(confusion_matrix, classes_num)
+                plt.savefig(EXPERIMENT_DIR + h5_file + '_test.jpg')
+                # report
+                logger.info(classification_report(y_test_subset, y_testing_prediction))
+                # top5 accuracy
+                top5 = top_n_accuracy(y_testing_proba, y_test_subset, 5)
+                logger.info('Top5 accuracy = {:.2f}'.format(top5))
+                # Compute ROC curve and ROC area for each class
+                mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
+                                      mode='lines',
+                                      line=dict(color='navy', width=2, dash='dash'),
+                                      name='Mid-lane')
+                # auc, tpr, fpr = auc_avg.value()
+                # avg_lane = go.Scatter(x=fpr, y=tpr,
+                #                       mode='lines',
+                #                       line=dict(color='deeppink', width=1, dash='dot'),
+                #                       name='average ROC curve (area = {:.2f})'.format(float(auc)))
+                traces = [mid_lane]
+                avg_y = []
+                avg_y_proba = []
+                for current_class in range(NUM_CLASSES):
+                    current_class_y_testing = []
+                    for jj in y_test_subset:
+                        current_class_y_testing.append(1 if int(jj) == current_class else 0)
+                    fpr, tpr, threshold = roc_curve(current_class_y_testing, y_testing_proba[:, current_class])
+                    roc_auc = auc(fpr, tpr)
+                    color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255),
+                                                     random.randint(0, 255))
+                    trace = go.Scatter(x=fpr, y=tpr,
+                                       mode='lines',
+                                       line=dict(color=color, width=1),
+                                       name='{} (area = {:.2f})'.format(classes_num[current_class], float(roc_auc))
+                                       )
+                    traces.append(trace)
+                    # Add to average
+                    avg_y.append(current_class_y_testing)
+                    avg_y_per_parameter.append(current_class_y_testing)
+                    avg_y_proba.append(y_testing_proba[:, current_class])
+                    avg_y_proba_per_parameter.append(y_testing_proba[:, current_class])
+
+                avg_y = np.concatenate((avg_y), axis=0)
+                avg_y_proba = np.concatenate((avg_y_proba), axis=0)
+
+                fpr, tpr, threshold = roc_curve(avg_y, avg_y_proba)
+                roc_auc = auc(fpr, tpr)
+                avg_lane = go.Scatter(x=fpr, y=tpr,
+                                      mode='lines',
+                                      line=dict(color='deeppink', width=1, dash='dot'),
+                                      name='average ROC curve (area = {:.2f})'.format(float(roc_auc)))
+                traces.append(avg_lane)
+                layout = go.Layout(title='Receiver operating characteristic',
+                                   xaxis=dict(title='False Positive Rate'),
+                                   yaxis=dict(title='True Positive Rate'))
+                plotly.offline.plot({
+                    "data": traces,
+                    "layout": layout
+                }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-test.html'.format(h5_file, idx))
+
+                logger.info('Ended testing new SVM on testing data')
+
+            avg_y_per_parameter = np.concatenate((avg_y_per_parameter), axis=0)
+            avg_y_proba_per_parameter = np.concatenate((avg_y_proba_per_parameter), axis=0)
+            fpr, tpr, threshold = roc_curve(avg_y_per_parameter, avg_y_proba_per_parameter)
             roc_auc = auc(fpr, tpr)
-            avg_lane = go.Scatter(x=fpr, y=tpr,
-                                  mode='lines',
-                                  line=dict(color='deeppink', width=1, dash='dot'),
-                                  name='average ROC curve (area = {:.2f})'.format(float(roc_auc)))
-            traces.append(avg_lane)
+            avg_lane_per_parameter = go.Scatter(x=fpr, y=tpr,
+                                                mode='lines',
+                                                line=dict(color='deeppink', width=1, dash='dot'),
+                                                name='average ROC curve (area = {:.2f})'.format(float(roc_auc)))
             layout = go.Layout(title='Receiver operating characteristic',
                                xaxis=dict(title='False Positive Rate'),
                                yaxis=dict(title='True Positive Rate'))
             plotly.offline.plot({
-                "data": traces,
-                "layout": layout
-            }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-train.html'.format(h5_file, idx))
-
-            logger.info('Ended testing new SVM on training data')
-
-            # ----------------------------------------------------------------------------------------------------------
-            logger.info('Start testing new SVM on testing data')
-
-            y_testing_prediction = svm_classifier.predict(X_test)
-            y_testing_proba = svm_classifier.predict_proba(X_test)
-
-            # Step statistics - confusion matrix + ROC
-            # confusion matrix
-            confusion_matrix = metrics.confusion_matrix(y_true=y_test, y_pred=y_testing_prediction)
-            classes_num = [str(x) for x in range(NUM_CLASSES)]
-            logger.info('Confusion matrix:\n' + str(confusion_matrix))
-            fig = plot_confusion_matrix(confusion_matrix, classes_num)
-            plt.savefig(EXPERIMENT_DIR + h5_file + '_test.jpg')
-            # report
-            logger.info(classification_report(y_test, y_testing_prediction))
-            # top5 accuracy
-            top5 = top_n_accuracy(y_testing_proba, y_test, 5)
-            logger.info('Top5 accuray = {:.2f}'.format(top5))
-            # Compute ROC curve and ROC area for each class
-            mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
-                                  mode='lines',
-                                  line=dict(color='navy', width=2, dash='dash'),
-                                  name='Mid-lane')
-            # auc, tpr, fpr = auc_avg.value()
-            # avg_lane = go.Scatter(x=fpr, y=tpr,
-            #                       mode='lines',
-            #                       line=dict(color='deeppink', width=1, dash='dot'),
-            #                       name='average ROC curve (area = {:.2f})'.format(float(auc)))
-            traces = [mid_lane]
-            avg_y = []
-            avg_y_proba = []
-            for current_class in range(NUM_CLASSES):
-                current_class_y_testing = []
-                for jj in y_test:
-                    current_class_y_testing.append(1 if int(jj) == current_class else 0)
-                fpr, tpr, threshold = roc_curve(current_class_y_testing, y_testing_proba[:, current_class])
-                roc_auc = auc(fpr, tpr)
-                color = 'rgb({}, {}, {})'.format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                trace = go.Scatter(x=fpr, y=tpr,
-                                   mode='lines',
-                                   line=dict(color=color, width=1),
-                                   name='{} (area = {:.2f})'.format(classes_num[current_class], float(roc_auc))
-                                   )
-                traces.append(trace)
-                # Add to average
-                avg_y.append(current_class_y_testing)
-                avg_y_proba.append(y_testing_proba[:, current_class])
-
-            avg_y = np.concatenate((avg_y), axis=0)
-            avg_y_proba = np.concatenate((avg_y_proba), axis=0)
-            fpr, tpr, threshold = roc_curve(avg_y, avg_y_proba)
-            roc_auc = auc(fpr, tpr)
-            avg_lane = go.Scatter(x=fpr, y=tpr,
-                                  mode='lines',
-                                  line=dict(color='deeppink', width=1, dash='dot'),
-                                  name='average ROC curve (area = {:.2f})'.format(float(roc_auc)))
-            traces.append(avg_lane)
-            layout = go.Layout(title='Receiver operating characteristic',
-                               xaxis=dict(title='False Positive Rate'),
-                               yaxis=dict(title='True Positive Rate'))
-            plotly.offline.plot({
-                "data": traces,
+                "data": [avg_lane_per_parameter],
                 "layout": layout
             }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-test.html'.format(h5_file, idx))
-
-            logger.info('Ended testing new SVM on testing data')
