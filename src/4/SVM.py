@@ -311,7 +311,7 @@ if __name__ == "__main__":
                 traces = [mid_lane]
                 avg_y = []
                 avg_y_proba = []
-                for current_class in range(subset_index * classes_in_subset, (subset_index + 1) * classes_in_subset):
+                for current_class in range(int(NUM_CLASSES / args.DIVIDE)):
                     current_class_y_training = []
                     for jj in y_training_subset:
                         current_class_y_training.append(1 if int(jj) == current_class else 0)
@@ -378,7 +378,7 @@ if __name__ == "__main__":
                 traces = [mid_lane]
                 avg_y = []
                 avg_y_proba = []
-                for current_class in range(subset_index * classes_in_subset, (subset_index + 1) * classes_in_subset):
+                for current_class in range(NUM_CLASSES / args.DIVIDE):
                     current_class_y_testing = []
                     for jj in y_test_subset:
                         current_class_y_testing.append(1 if int(jj) == current_class else 0)
