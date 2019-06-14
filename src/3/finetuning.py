@@ -71,6 +71,8 @@ parser.add_argument("--use_scheduler", dest="USE_SCHEDULER", help="use scheduler
                     action='store_true')
 parser.add_argument("--nogpu", dest="NOGPU", help="Specify if you don't want to use GPU (CUDA)",
                     action='store_true')
+parser.add_argument("--nopretrained", dest="NOPRETRAINED", help="Specify if you don't want model to be pretrained",
+                    action='store_false')
 parser.add_argument("--roc_drawing", dest="ROC_DRAWING", help="ROC will be drawn once every N-th epochs. Specify N.",
                     type=int, default=5)
 
@@ -110,7 +112,7 @@ def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
     return fig
 
 
-def train_model_all(model, criterion, optimizer, scheduler, num_epochs, model_name):
+def train_model_all(model, criterion, optimizer, num_epochs, model_name):
     confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
     accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
     total_loss_meter = 0
@@ -137,8 +139,8 @@ def train_model_all(model, criterion, optimizer, scheduler, num_epochs, model_na
             data_processed = 0
 
             if phase == 'train':
-                if args.USE_SCHEDULER:
-                    scheduler.step()
+                # if args.USE_SCHEDULER:
+                #     scheduler.step()
                 model.train()  # Set model to training mode
             else:
                 model.eval()  # Set model to evaluate mode
@@ -405,7 +407,7 @@ if __name__ == "__main__":
 
 
     # create model
-    model_ft = models.vgg19_bn(pretrained=True)
+    model_ft = models.vgg19_bn(pretrained=args.NOPRETRAINED)
     freeze_params(model_ft.parameters())
     # # newly created layers have requires_grad == True
     # model_ft.classifier[6] = nn.Sequential(
@@ -478,7 +480,9 @@ if __name__ == "__main__":
     logger.info('Retrain whole network')
     logger.info('-' * 90)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.MSELoss()
+
+    model_ft = model_ft.to(device)
 
     params_to_update = []
     for name, param in model_ft.named_parameters():
@@ -486,20 +490,18 @@ if __name__ == "__main__":
             params_to_update.append(param)
             logger.info("\t{}".format(name))
 
-    logger.info('SGD: lr = {};  momentum = {}, weight decay = {}'.format(
-        args.LEARNING_RATE, args.MOMENTUM, args.WEIGHT_DECAY))
+    # logger.info('SGD: lr = {};  momentum = {}, weight decay = {}'.format(
+    #     args.LEARNING_RATE, args.MOMENTUM, args.WEIGHT_DECAY))
 
-    optimizer_ft = optim.SGD(params_to_update, lr=args.LEARNING_RATE, momentum=args.MOMENTUM,
-                             weight_decay=args.WEIGHT_DECAY)
+    optimizer_ft = optim.Adam(params_to_update, lr=args.LEARNING_RATE,  # momentum=args.MOMENTUM,
+                              weight_decay=args.WEIGHT_DECAY)
 
-    # Decay LR by a factor of x every y epochs
-    logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
+    # # Decay LR by a factor of x every y epochs
+    # logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
+    # exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
 
-    model_ft = model_ft.to(device)
-
-    model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS,
-                               model_name='first')
+    model_ft = train_model_all(model_ft, criterion, optimizer_ft,  # exp_lr_scheduler,
+                               num_epochs=args.EPOCHS, model_name='first')
     test_model_all(model_ft, 'first')
 
     first_network = copy.deepcopy(model_ft)
@@ -512,23 +514,25 @@ if __name__ == "__main__":
     logger.info('Reduce and retrain network')
     logger.info('-' * 90)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.MSELoss()
 
     # reduce classifier to ONE Linear layer
-    model_ft.classifier = nn.Sequential(*list(model_ft.classifier.children())[:-3])
+    model_ft.classifier = nn.Sequential(*list(model_ft.classifier.children())[:-6])
     num_ftrs = model_ft.classifier[-1].in_features
     model_ft.classifier[-1] = nn.Linear(num_ftrs, NUM_CLASSES)
     conv_list = list(model_ft.features.children())
-    # reduce all batchnorm2d layers
-    batchnorm2d_type = type(conv_list[1])
-    for ii in range(len(conv_list)):
-        if not (0 <= ii < len(conv_list)):
-            continue
-        layer = conv_list[ii]
-        if isinstance(layer, batchnorm2d_type):
-            conv_list = conv_list[:ii] + conv_list[(ii + 1):]
-            ii -= 1
-    model_ft.features = nn.Sequential(*conv_list)
+    # # reduce all batchnorm2d layers
+    # batchnorm2d_type = type(conv_list[1])
+    # for ii in range(len(conv_list)):
+    #     if not (0 <= ii < len(conv_list)):
+    #         continue
+    #     layer = conv_list[ii]
+    #     if isinstance(layer, batchnorm2d_type):
+    #         conv_list = conv_list[:ii] + conv_list[(ii + 1):]
+    #         ii -= 1
+    # model_ft.features = nn.Sequential(*conv_list)
+
+    model_ft = model_ft.to(device)
 
     params_to_update = []
     for name, param in model_ft.named_parameters():
@@ -536,20 +540,18 @@ if __name__ == "__main__":
             params_to_update.append(param)
             logger.info("\t{}".format(name))
 
-    logger.info('SGD: lr = {};  momentum = {}, weight decay = {}'.format(
-        args.LEARNING_RATE, 0, 0))
+    # logger.info('SGD: lr = {};  momentum = {}, weight decay = {}'.format(
+    #     args.LEARNING_RATE, args.MOMENTUM, args.WEIGHT_DECAY))
 
-    optimizer_ft = optim.SGD(params_to_update, lr=args.LEARNING_RATE, momentum=0,
-                             weight_decay=0)
+    optimizer_ft = optim.Adam(params_to_update, lr=args.LEARNING_RATE, momentum=args.MOMENTUM,
+                              weight_decay=args.WEIGHT_DECAY)
 
-    # Decay LR by a factor of x every y epochs
-    logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
+    # # Decay LR by a factor of x every y epochs
+    # logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
+    # exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
 
-    model_ft = model_ft.to(device)
-
-    model_ft = train_model_all(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=args.EPOCHS,
-                               model_name='second')
+    model_ft = train_model_all(model_ft, criterion, optimizer_ft,  # exp_lr_scheduler,
+                               num_epochs=args.EPOCHS, model_name='second')
     test_model_all(model_ft, 'second')
 
     second_network = copy.deepcopy(model_ft)

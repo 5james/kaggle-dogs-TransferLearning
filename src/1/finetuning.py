@@ -115,7 +115,7 @@ def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
     return fig
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(model, criterion, optimizer, num_epochs=25):
     confusion_matrix = torchnet.meter.ConfusionMeter(NUM_CLASSES)
     accuracy_meter = torchnet.meter.ClassErrorMeter(topk=[1, 5], accuracy=True)
     total_loss_meter = 0
@@ -142,8 +142,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             data_processed = 0
 
             if phase == 'train':
-                if args.USE_SCHEDULER:
-                    scheduler.step()
+                # if args.USE_SCHEDULER:
+                #     scheduler.step()
                 model.train()  # Set model to training mode
             else:
                 model.eval()  # Set model to evaluate mode
@@ -474,7 +474,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() and not args.NOGPU else "cpu")
     model_ft = model_ft.to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.MSELoss()
 
     params_to_update = []
     for name, param in model_ft.named_parameters():
@@ -482,16 +482,16 @@ if __name__ == "__main__":
             params_to_update.append(param)
             logger.info("\t{}".format(name))
 
-    logger.info('SGD: lr = {};  momentum = {}, weight decay = {}'.format(
-        args.LEARNING_RATE, args.MOMENTUM, args.WEIGHT_DECAY))
+    # logger.info('SGD: lr = {};  momentum = {}, weight decay = {}'.format(
+    #     args.LEARNING_RATE, args.MOMENTUM, args.WEIGHT_DECAY))
 
-    optimizer_ft = optim.SGD(params_to_update, lr=args.LEARNING_RATE, momentum=args.MOMENTUM,
-                             weight_decay=args.WEIGHT_DECAY)
+    optimizer_ft = optim.Adam(params_to_update, lr=args.LEARNING_RATE,  # momentum=args.MOMENTUM,
+                              weight_decay=args.WEIGHT_DECAY)
 
-    # Decay LR by a factor of x every y epochs
-    logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
+    # # Decay LR by a factor of x every y epochs
+    # logger.info('StepLR: step_size = {};  gamma = {}'.format(args.STEP_SIZE, args.GAMMA))
+    # exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=args.STEP_SIZE, gamma=args.GAMMA)
 
-    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
+    model_ft = train_model(model_ft, criterion, optimizer_ft,  # exp_lr_scheduler,
                            num_epochs=args.EPOCHS)
     test_model(model_ft)
