@@ -480,7 +480,7 @@ if __name__ == "__main__":
     logger.info('Retrain whole network')
     logger.info('-' * 90)
 
-    criterion = nn.MSELoss()
+    criterion = nn.CrossEntropyLoss()
 
     model_ft = model_ft.to(device)
 
@@ -514,7 +514,7 @@ if __name__ == "__main__":
     logger.info('Reduce and retrain network')
     logger.info('-' * 90)
 
-    criterion = nn.MSELoss()
+    criterion = nn.CrossEntropyLoss()
 
     # reduce classifier to ONE Linear layer
     model_ft.classifier = nn.Sequential(*list(model_ft.classifier.children())[:-6])

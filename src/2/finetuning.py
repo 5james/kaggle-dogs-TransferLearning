@@ -474,7 +474,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() and not args.NOGPU else "cpu")
     model_ft = model_ft.to(device)
 
-    criterion = nn.MSELoss()
+    criterion = nn.CrossEntropyLoss()
 
     params_to_update = []
     for name, param in model_ft.named_parameters():
