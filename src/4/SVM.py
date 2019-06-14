@@ -303,7 +303,7 @@ if __name__ == "__main__":
                 # top5 accuracy
 
                 top5 = top_n_accuracy(y_training_proba, y_training_subset_proba, 5)
-                logger.info('Top5 accuray = {:.2f}'.format(top5))
+                logger.info('Top5 accuray = {:.3f}'.format(top5))
                 # Compute ROC curve and ROC area for each class
                 mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
                                       mode='lines',
@@ -328,7 +328,7 @@ if __name__ == "__main__":
                     trace = go.Scatter(x=fpr, y=tpr,
                                        mode='lines',
                                        line=dict(color=color, width=1),
-                                       name='{} (area = {:.2f})'.format(classes_num[current_class], float(roc_auc))
+                                       name='{} (area = {:.3f})'.format(classes_num[current_class], float(roc_auc))
                                        )
                     traces.append(trace)
                     # Add to average
@@ -342,7 +342,7 @@ if __name__ == "__main__":
                 avg_lane = go.Scatter(x=fpr, y=tpr,
                                       mode='lines',
                                       line=dict(color='deeppink', width=1, dash='dot'),
-                                      name='average ROC curve (area = {:.2f})'.format(float(roc_auc)))
+                                      name='average ROC curve (area = {:.3f})'.format(float(roc_auc)))
                 traces.append(avg_lane)
                 layout = go.Layout(title='Receiver operating characteristic',
                                    xaxis=dict(title='False Positive Rate'),
@@ -372,7 +372,7 @@ if __name__ == "__main__":
                 logger.info(classification_report(y_test_subset, y_testing_prediction))
                 # top5 accuracy
                 top5 = top_n_accuracy(y_testing_proba, y_test_subset_proba, 5)
-                logger.info('Top5 accuracy = {:.2f}'.format(top5))
+                logger.info('Top5 accuracy = {:.3f}'.format(top5))
                 # Compute ROC curve and ROC area for each class
                 mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
                                       mode='lines',
@@ -397,7 +397,7 @@ if __name__ == "__main__":
                     trace = go.Scatter(x=fpr, y=tpr,
                                        mode='lines',
                                        line=dict(color=color, width=1),
-                                       name='{} (area = {:.2f})'.format(classes_num[current_class], float(roc_auc))
+                                       name='{} (area = {:.3f})'.format(classes_num[current_class], float(roc_auc))
                                        )
                     traces.append(trace)
                     # Add to average
@@ -414,7 +414,7 @@ if __name__ == "__main__":
                 avg_lane = go.Scatter(x=fpr, y=tpr,
                                       mode='lines',
                                       line=dict(color='deeppink', width=1, dash='dot'),
-                                      name='average ROC curve (area = {:.2f})'.format(float(roc_auc)))
+                                      name='average ROC curve (area = {:.3f})'.format(float(roc_auc)))
                 traces.append(avg_lane)
                 layout = go.Layout(title='Receiver operating characteristic',
                                    xaxis=dict(title='False Positive Rate'),
@@ -433,7 +433,7 @@ if __name__ == "__main__":
             avg_lane_per_parameter = go.Scatter(x=fpr, y=tpr,
                                                 mode='lines',
                                                 line=dict(color='deeppink', width=1, dash='dot'),
-                                                name='average ROC curve (area = {:.2f})'.format(float(roc_auc)))
+                                                name='average ROC curve (area = {:.3f})'.format(float(roc_auc)))
             layout = go.Layout(title='Receiver operating characteristic',
                                xaxis=dict(title='False Positive Rate'),
                                yaxis=dict(title='True Positive Rate'))
