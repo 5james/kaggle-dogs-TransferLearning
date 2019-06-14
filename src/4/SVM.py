@@ -268,6 +268,9 @@ if __name__ == "__main__":
                 logger.info('Testing CNN Codes X subset shape: {}'.format(X_test_subset.shape))
                 logger.info('Testing CNN Codes y subset shape: {}'.format(y_test_subset.shape))
 
+                y_training_subset_proba = y_training_subset - subset_index * classes_in_subset
+                y_test_subset_proba = y_test_subset - subset_index * classes_in_subset
+
                 # Create new SVM
                 svm_classifier = svm.SVC(kernel=params['kernel'],
                                          degree=params['degree'],
@@ -285,7 +288,7 @@ if __name__ == "__main__":
 
                 y_training_prediction = svm_classifier.predict(X_training_subset)
                 y_training_proba = svm_classifier.predict_proba(X_training_subset)
-                y_training_subset_proba = y_training_subset - subset_index * classes_in_subset
+
 
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
@@ -299,7 +302,7 @@ if __name__ == "__main__":
                 logger.info(classification_report(y_training_subset, y_training_prediction))
                 # top5 accuracy
 
-                top5 = top_n_accuracy(y_training_proba, y_training_subset, 5)
+                top5 = top_n_accuracy(y_training_proba, y_training_subset_proba, 5)
                 logger.info('Top5 accuray = {:.2f}'.format(top5))
                 # Compute ROC curve and ROC area for each class
                 mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
@@ -316,7 +319,7 @@ if __name__ == "__main__":
                 avg_y_proba = []
                 for current_class in range(int(NUM_CLASSES / args.DIVIDE)):
                     current_class_y_training = []
-                    for jj in y_training_subset:
+                    for jj in y_training_subset_proba:
                         current_class_y_training.append(1 if int(jj) == current_class else 0)
                     fpr, tpr, threshold = roc_curve(current_class_y_training, y_training_proba[:, current_class])
                     roc_auc = auc(fpr, tpr)
@@ -368,7 +371,7 @@ if __name__ == "__main__":
                 # report
                 logger.info(classification_report(y_test_subset, y_testing_prediction))
                 # top5 accuracy
-                top5 = top_n_accuracy(y_testing_proba, y_test_subset, 5)
+                top5 = top_n_accuracy(y_testing_proba, y_test_subset_proba, 5)
                 logger.info('Top5 accuracy = {:.2f}'.format(top5))
                 # Compute ROC curve and ROC area for each class
                 mid_lane = go.Scatter(x=[0, 1], y=[0, 1],
@@ -385,7 +388,7 @@ if __name__ == "__main__":
                 avg_y_proba = []
                 for current_class in range(int(NUM_CLASSES / args.DIVIDE)):
                     current_class_y_testing = []
-                    for jj in y_test_subset:
+                    for jj in y_test_subset_proba:
                         current_class_y_testing.append(1 if int(jj) == current_class else 0)
                     fpr, tpr, threshold = roc_curve(current_class_y_testing, y_testing_proba[:, current_class])
                     roc_auc = auc(fpr, tpr)
