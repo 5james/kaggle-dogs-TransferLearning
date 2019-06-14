@@ -280,12 +280,12 @@ if __name__ == "__main__":
                 svm_classifier.fit(X_training_subset, y_training_subset.ravel())
                 logger.info('Ended training SVM')
 
+                # ------------------------------------------------------------------------------------------------------
                 logger.info('Start testing SVM on training data')
 
                 y_training_prediction = svm_classifier.predict(X_training_subset)
                 y_training_proba = svm_classifier.predict_proba(X_training_subset)
 
-                # ------------------------------------------------------------------------------------------------------
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
                 confusion_matrix = metrics.confusion_matrix(y_true=y_training_subset, y_pred=y_training_prediction)
@@ -417,7 +417,7 @@ if __name__ == "__main__":
                 plotly.offline.plot({
                     "data": traces,
                     "layout": layout
-                }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-test.html'.format(h5_file, idx))
+                }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-{}-test.html'.format(h5_file, idx, subset_index))
 
                 logger.info('Ended testing new SVM on testing data')
 
@@ -435,4 +435,4 @@ if __name__ == "__main__":
             plotly.offline.plot({
                 "data": [avg_lane_per_parameter],
                 "layout": layout
-            }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-{}-test.html'.format(h5_file, idx, subset_index))
+            }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-test.html'.format(h5_file, idx))
