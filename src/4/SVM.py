@@ -86,7 +86,7 @@ def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
     # np.set_printoptions(precision=2)
     ###fig, ax = matplotlib.figure.Figure()
 
-    fig = plt.figure(figsize=(20, 20), dpi=640, facecolor='w', edgecolor='k')
+    fig = plt.figure(figsize=(10, 10), dpi=320, facecolor='w', edgecolor='k')
     ax = fig.add_subplot(1, 1, 1)
     im = ax.imshow(cm, cmap='Oranges')
 
@@ -359,7 +359,9 @@ if __name__ == "__main__":
                 # confusion matrix
                 confusion_matrix = metrics.confusion_matrix(y_true=y_test_subset, y_pred=y_testing_prediction)
                 logger.info('Confusion matrix:\n' + str(confusion_matrix))
-                fig = plot_confusion_matrix(confusion_matrix, classes_num)
+                fig = plot_confusion_matrix(confusion_matrix,
+                                            classes_num[subset_index * classes_in_subset:
+                                                        (subset_index + 1) * classes_in_subset])
                 plt.savefig(EXPERIMENT_DIR + h5_file + '_test-' + str(subset_index) + '.jpg')
                 # report
                 logger.info(classification_report(y_test_subset, y_testing_prediction))
