@@ -42,9 +42,11 @@ parser.add_argument("-p", "--pca_reduction", dest="PCA_REDUCTION", help="this nu
                     type=int, default=15000)
 parser.add_argument("-nj", "--n_jobs", dest="N_JOBS", help="number of threads used.",
                     type=int, default=16)
-parser.add_argument("-d", "-divide", dest="DIVIDE", help="On how many sets of classes should CNN codes be divided"
+parser.add_argument("-d", "--divide", dest="DIVIDE", help="On how many sets of classes should CNN codes be divided"
                                                          " (RAM problem). There are 120 classes total.",
                     type=int, default=3)
+parser.add_argument("-s", "--start_from", dest="START_FROM", help="For logging purposes start from index.",
+                    type=int, default=0)
 
 
 class StreamToLogger(object):
@@ -245,7 +247,7 @@ if __name__ == "__main__":
 
         classes_num = [str(x) for x in range(NUM_CLASSES)]
 
-        for idx, params in enumerate(testing_parameters):
+        for idx, params in enumerate(testing_parameters, start=args.START_FROM):
             logger.info('Start training SVM with params: {}'.format(params))
             avg_y_per_parameter = []
             avg_y_proba_per_parameter = []
