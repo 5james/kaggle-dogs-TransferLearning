@@ -156,10 +156,10 @@ if __name__ == "__main__":
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
 
-    # for svm verbose
-    sl = StreamToLogger(logger, logging.INFO)
-    sys.stdout = sl
-    logger.info(args)
+    # # for svm verbose
+    # sl = StreamToLogger(logger, logging.INFO)
+    # sys.stdout = sl
+    # logger.info(args)
 
     # add the handlers to the logger
     logger.addHandler(fh)
@@ -277,7 +277,7 @@ if __name__ == "__main__":
                                          cache_size=250,
                                          random_state=np.random.RandomState(0))
                 # Learn SVM on subset
-                svm_classifier.fit(X_training_subset, y_training_subset)
+                svm_classifier.fit(X_training_subset, y_training_subset.ravel())
                 logger.info('Ended training SVM')
 
                 logger.info('Start testing SVM on training data')
@@ -285,6 +285,7 @@ if __name__ == "__main__":
                 y_training_prediction = svm_classifier.predict(X_training_subset)
                 y_training_proba = svm_classifier.predict_proba(X_training_subset)
 
+                # ------------------------------------------------------------------------------------------------------
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
                 confusion_matrix = metrics.confusion_matrix(y_true=y_training_subset, y_pred=y_training_prediction)
@@ -292,7 +293,7 @@ if __name__ == "__main__":
                 fig = plot_confusion_matrix(confusion_matrix,
                                             classes_num[subset_index * classes_in_subset:
                                                         (subset_index + 1) * classes_in_subset])
-                plt.savefig(EXPERIMENT_DIR + h5_file + '_train.jpg')
+                plt.savefig(EXPERIMENT_DIR + h5_file + '_train' + str(subset_index) + '.jpg')
                 # report
                 logger.info(classification_report(y_training_subset, y_training_prediction))
                 # top5 accuracy
@@ -344,11 +345,11 @@ if __name__ == "__main__":
                 plotly.offline.plot({
                     "data": traces,
                     "layout": layout
-                }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-train.html'.format(h5_file, idx))
+                }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-{}-train.html'.format(h5_file, idx, subset_index))
 
                 logger.info('Ended testing new SVM on training data')
 
-                # ----------------------------------------------------------------------------------------------------------
+                # ------------------------------------------------------------------------------------------------------
                 logger.info('Start testing new SVM on testing data')
 
                 y_testing_prediction = svm_classifier.predict(X_test_subset)
@@ -359,7 +360,7 @@ if __name__ == "__main__":
                 confusion_matrix = metrics.confusion_matrix(y_true=y_test_subset, y_pred=y_testing_prediction)
                 logger.info('Confusion matrix:\n' + str(confusion_matrix))
                 fig = plot_confusion_matrix(confusion_matrix, classes_num)
-                plt.savefig(EXPERIMENT_DIR + h5_file + '_test.jpg')
+                plt.savefig(EXPERIMENT_DIR + h5_file + '_test-' + str(subset_index) + '.jpg')
                 # report
                 logger.info(classification_report(y_test_subset, y_testing_prediction))
                 # top5 accuracy
@@ -378,7 +379,7 @@ if __name__ == "__main__":
                 traces = [mid_lane]
                 avg_y = []
                 avg_y_proba = []
-                for current_class in range(NUM_CLASSES / args.DIVIDE):
+                for current_class in range(int(NUM_CLASSES / args.DIVIDE)):
                     current_class_y_testing = []
                     for jj in y_test_subset:
                         current_class_y_testing.append(1 if int(jj) == current_class else 0)
@@ -432,4 +433,4 @@ if __name__ == "__main__":
             plotly.offline.plot({
                 "data": [avg_lane_per_parameter],
                 "layout": layout
-            }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-test.html'.format(h5_file, idx))
+            }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-{}-test.html'.format(h5_file, idx, subset_index))
