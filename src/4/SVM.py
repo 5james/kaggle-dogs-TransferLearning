@@ -18,6 +18,7 @@ import matplotlib
 from sklearn.metrics import classification_report
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA, SparsePCA
+from sklearn import preprocessing
 
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -28,24 +29,6 @@ LOG_DIR = 'logs/'
 matplotlib.use('agg')
 
 NUM_CLASSES = 120
-
-
-def top_n_accuracy(preds, target, n):
-    best_n = np.argsort(preds, axis=1)[:, -n:]
-    successes = 0
-    for i in range(len(target)):
-        if target[i] in best_n[i, :]:
-            successes += 1
-    return float(successes) / target.shape[0]
-
-
-def is_number(s):
-    try:
-        float(s)
-        return True
-    except ValueError:
-        return False
-
 
 parser = ArgumentParser()
 parser.add_argument("-e", "--experiment-dir", dest="EXPERIMENT_DIR", help="Pack whole experiment in one directory"
@@ -115,6 +98,23 @@ def plot_confusion_matrix(cm, classes, title='Confusion matrix'):
     # data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
 
     return fig
+
+
+def top_n_accuracy(preds, target, n):
+    best_n = np.argsort(preds, axis=1)[:, -n:]
+    successes = 0
+    for i in range(len(target)):
+        if target[i] in best_n[i, :]:
+            successes += 1
+    return float(successes) / target.shape[0]
+
+
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 
 def quadraticKernel(X, Y):
@@ -260,9 +260,9 @@ if __name__ == "__main__":
                     mapping_idx_y_val[subset_index * classes_in_subset:(subset_index + 1) * classes_in_subset])
 
                 X_training_subset = np.vstack([X_training[tmp] for tmp in all_indexes_in_subset_training])
-                y_training_subset = np.vstack([y_training[tmp] for tmp in all_indexes_in_subset_training])
+                y_training_subset = np.vstack([y_training[tmp] for tmp in all_indexes_in_subset_training]).ravel()
                 X_test_subset = np.vstack([X_test[tmp] for tmp in all_indexes_in_subset_test])
-                y_test_subset = np.vstack([y_test[tmp] for tmp in all_indexes_in_subset_test])
+                y_test_subset = np.vstack([y_test[tmp] for tmp in all_indexes_in_subset_test]).ravel()
                 logger.info('Training CNN Codes X subset shape: {}'.format(X_training_subset.shape))
                 logger.info('Training CNN Codes y subset shape: {}'.format(y_training_subset.shape))
                 logger.info('Testing CNN Codes X subset shape: {}'.format(X_test_subset.shape))
@@ -277,7 +277,7 @@ if __name__ == "__main__":
                                          cache_size=250,
                                          random_state=np.random.RandomState(0))
                 # Learn SVM on subset
-                svm_classifier.fit(X_training_subset, y_training_subset.ravel())
+                svm_classifier.fit(X_training_subset, y_training_subset)
                 logger.info('Ended training SVM')
 
                 # ------------------------------------------------------------------------------------------------------
@@ -285,6 +285,7 @@ if __name__ == "__main__":
 
                 y_training_prediction = svm_classifier.predict(X_training_subset)
                 y_training_proba = svm_classifier.predict_proba(X_training_subset)
+                y_training_subset_proba = y_training_subset - subset_index * classes_in_subset
 
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
@@ -297,6 +298,7 @@ if __name__ == "__main__":
                 # report
                 logger.info(classification_report(y_training_subset, y_training_prediction))
                 # top5 accuracy
+
                 top5 = top_n_accuracy(y_training_proba, y_training_subset, 5)
                 logger.info('Top5 accuray = {:.2f}'.format(top5))
                 # Compute ROC curve and ROC area for each class
