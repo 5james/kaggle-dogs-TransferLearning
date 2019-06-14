@@ -282,7 +282,8 @@ if __name__ == "__main__":
                                          verbose=True,
                                          cache_size=250,
                                          random_state=np.random.RandomState(0))
-                bagging_svm=BaggingClassifier(base_estimator=svm_classifier, max_features=0.25, max_samples=0.25)
+                bagging_svm = BaggingClassifier(base_estimator=svm_classifier, max_features=0.25, max_samples=0.25,
+                                                n_jobs=args.N_JOBS)
                 # Learn SVM on subset
                 bagging_svm.fit(X_training_subset, y_training_subset)
                 logger.info('Ended training SVM')
