@@ -17,6 +17,7 @@ import plotly.graph_objs as go
 import matplotlib
 from sklearn.metrics import classification_report
 from sklearn.manifold import TSNE
+from sklearn.ensemble import BaggingClassifier
 from sklearn.decomposition import PCA, SparsePCA
 from sklearn import preprocessing
 
@@ -41,9 +42,9 @@ parser.add_argument("-p", "--pca_reduction", dest="PCA_REDUCTION", help="this nu
                                                                         "pca will reduce.",
                     type=int, default=15000)
 parser.add_argument("-nj", "--n_jobs", dest="N_JOBS", help="number of threads used.",
-                    type=int, default=16)
+                    type=int, default=8)
 parser.add_argument("-d", "--divide", dest="DIVIDE", help="On how many sets of classes should CNN codes be divided"
-                                                         " (RAM problem). There are 120 classes total.",
+                                                          " (RAM problem). There are 120 classes total.",
                     type=int, default=3)
 parser.add_argument("-s", "--start_from", dest="START_FROM", help="For logging purposes start from index.",
                     type=int, default=0)
@@ -281,16 +282,16 @@ if __name__ == "__main__":
                                          verbose=True,
                                          cache_size=250,
                                          random_state=np.random.RandomState(0))
+                bagging_svm=BaggingClassifier(base_estimator=svm_classifier, max_features=0.25, max_samples=0.25)
                 # Learn SVM on subset
-                svm_classifier.fit(X_training_subset, y_training_subset)
+                bagging_svm.fit(X_training_subset, y_training_subset)
                 logger.info('Ended training SVM')
 
                 # ------------------------------------------------------------------------------------------------------
                 logger.info('Start testing SVM on training data')
 
-                y_training_prediction = svm_classifier.predict(X_training_subset)
-                y_training_proba = svm_classifier.predict_proba(X_training_subset)
-
+                y_training_prediction = bagging_svm.predict(X_training_subset)
+                y_training_proba = bagging_svm.predict_proba(X_training_subset)
 
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
@@ -359,8 +360,8 @@ if __name__ == "__main__":
                 # ------------------------------------------------------------------------------------------------------
                 logger.info('Start testing new SVM on testing data')
 
-                y_testing_prediction = svm_classifier.predict(X_test_subset)
-                y_testing_proba = svm_classifier.predict_proba(X_test_subset)
+                y_testing_prediction = bagging_svm.predict(X_test_subset)
+                y_testing_proba = bagging_svm.predict_proba(X_test_subset)
 
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
