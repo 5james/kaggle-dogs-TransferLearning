@@ -243,6 +243,8 @@ if __name__ == "__main__":
 
         classes_in_subset = int(NUM_CLASSES / args.DIVIDE)
 
+        classes_num = [str(x) for x in range(NUM_CLASSES)]
+
         for idx, params in enumerate(testing_parameters):
             logger.info('Start training SVM with params: {}'.format(params))
             avg_y_per_parameter = []
@@ -286,9 +288,10 @@ if __name__ == "__main__":
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
                 confusion_matrix = metrics.confusion_matrix(y_true=y_training_subset, y_pred=y_training_prediction)
-                classes_num = [str(x) for x in range(NUM_CLASSES)]
                 logger.info('Confusion matrix:\n' + str(confusion_matrix))
-                fig = plot_confusion_matrix(confusion_matrix, classes_num)
+                fig = plot_confusion_matrix(confusion_matrix,
+                                            classes_num[subset_index * classes_in_subset:
+                                                        (subset_index + 1) * classes_in_subset])
                 plt.savefig(EXPERIMENT_DIR + h5_file + '_train.jpg')
                 # report
                 logger.info(classification_report(y_training_subset, y_training_prediction))
@@ -308,7 +311,7 @@ if __name__ == "__main__":
                 traces = [mid_lane]
                 avg_y = []
                 avg_y_proba = []
-                for current_class in range(NUM_CLASSES):
+                for current_class in range(subset_index * classes_in_subset, (subset_index + 1) * classes_in_subset):
                     current_class_y_training = []
                     for jj in y_training_subset:
                         current_class_y_training.append(1 if int(jj) == current_class else 0)
@@ -354,7 +357,6 @@ if __name__ == "__main__":
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
                 confusion_matrix = metrics.confusion_matrix(y_true=y_test_subset, y_pred=y_testing_prediction)
-                classes_num = [str(x) for x in range(NUM_CLASSES)]
                 logger.info('Confusion matrix:\n' + str(confusion_matrix))
                 fig = plot_confusion_matrix(confusion_matrix, classes_num)
                 plt.savefig(EXPERIMENT_DIR + h5_file + '_test.jpg')
@@ -376,7 +378,7 @@ if __name__ == "__main__":
                 traces = [mid_lane]
                 avg_y = []
                 avg_y_proba = []
-                for current_class in range(NUM_CLASSES):
+                for current_class in range(subset_index * classes_in_subset, (subset_index + 1) * classes_in_subset):
                     current_class_y_testing = []
                     for jj in y_test_subset:
                         current_class_y_testing.append(1 if int(jj) == current_class else 0)
