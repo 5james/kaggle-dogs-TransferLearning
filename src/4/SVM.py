@@ -248,16 +248,19 @@ if __name__ == "__main__":
             avg_y_per_parameter = []
             avg_y_proba_per_parameter = []
             for subset_index in range(args.DIVIDE):
-                logger.info('Training {}/{} subset'.format(subset_index, args.DIVIDE - 1))
+                logger.info('Training {}/{} subset'.format(subset_index + 1, args.DIVIDE))
 
                 # Create subsets
                 all_indexes_in_subset_training = np.concatenate(
                     mapping_idx_y_training[subset_index * classes_in_subset:(subset_index + 1) * classes_in_subset])
 
+                all_indexes_in_subset_test = np.concatenate(
+                    mapping_idx_y_val[subset_index * classes_in_subset:(subset_index + 1) * classes_in_subset])
+
                 X_training_subset = np.vstack([X_training[tmp] for tmp in all_indexes_in_subset_training])
                 y_training_subset = np.vstack([y_training[tmp] for tmp in all_indexes_in_subset_training])
-                X_test_subset = np.vstack([X_test[tmp] for tmp in all_indexes_in_subset_training])
-                y_test_subset = np.vstack([y_test[tmp] for tmp in all_indexes_in_subset_training])
+                X_test_subset = np.vstack([X_test[tmp] for tmp in all_indexes_in_subset_test])
+                y_test_subset = np.vstack([y_test[tmp] for tmp in all_indexes_in_subset_test])
                 logger.info('Training CNN Codes X subset shape: {}'.format(X_training_subset.shape))
                 logger.info('Training CNN Codes y subset shape: {}'.format(y_training_subset.shape))
                 logger.info('Testing CNN Codes X subset shape: {}'.format(X_test_subset.shape))
