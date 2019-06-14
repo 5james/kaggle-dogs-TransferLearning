@@ -282,17 +282,15 @@ if __name__ == "__main__":
                                          verbose=True,
                                          cache_size=250,
                                          random_state=np.random.RandomState(0))
-                bagging_svm = BaggingClassifier(base_estimator=svm_classifier, max_features=0.25, max_samples=0.25,
-                                                n_jobs=args.N_JOBS)
                 # Learn SVM on subset
-                bagging_svm.fit(X_training_subset, y_training_subset)
+                svm_classifier.fit(X_training_subset, y_training_subset)
                 logger.info('Ended training SVM')
 
                 # ------------------------------------------------------------------------------------------------------
                 logger.info('Start testing SVM on training data')
 
-                y_training_prediction = bagging_svm.predict(X_training_subset)
-                y_training_proba = bagging_svm.predict_proba(X_training_subset)
+                y_training_prediction = svm_classifier.predict(X_training_subset)
+                y_training_proba = svm_classifier.predict_proba(X_training_subset)
 
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
@@ -361,8 +359,8 @@ if __name__ == "__main__":
                 # ------------------------------------------------------------------------------------------------------
                 logger.info('Start testing new SVM on testing data')
 
-                y_testing_prediction = bagging_svm.predict(X_test_subset)
-                y_testing_proba = bagging_svm.predict_proba(X_test_subset)
+                y_testing_prediction = svm_classifier.predict(X_test_subset)
+                y_testing_proba = svm_classifier.predict_proba(X_test_subset)
 
                 # Step statistics - confusion matrix + ROC
                 # confusion matrix
