@@ -354,6 +354,10 @@ if __name__ == "__main__":
                     "layout": layout
                 }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-{}-train.html'.format(h5_file, idx, subset_index))
 
+                # clean memory
+                del y_training_prediction, y_training_proba, fpr, tpr, threshold, avg_y, avg_y_proba, traces, fig,
+                    confusion_matrix, layout, mid_lane
+
                 logger.info('Ended testing new SVM on training data')
 
                 # ------------------------------------------------------------------------------------------------------
@@ -443,3 +447,9 @@ if __name__ == "__main__":
                 "data": [avg_lane_per_parameter],
                 "layout": layout
             }, auto_open=False, filename=EXPERIMENT_DIR + '{}-{}-test.html'.format(h5_file, idx))
+
+            # clean memory
+            del y_testing_prediction, y_testing_proba, fpr, tpr, threshold, avg_y, avg_y_proba, traces, fig,
+                confusion_matrix, layout, mid_lane
+
+            logger.info('Ended testing new SVM on testing data')
