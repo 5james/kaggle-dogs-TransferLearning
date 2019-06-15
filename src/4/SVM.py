@@ -299,7 +299,7 @@ if __name__ == "__main__":
                 fig = plot_confusion_matrix(confusion_matrix,
                                             classes_num[subset_index * classes_in_subset:
                                                         (subset_index + 1) * classes_in_subset])
-                plt.savefig(EXPERIMENT_DIR + h5_file + '_train' + str(subset_index) + '.jpg')
+                plt.savefig(EXPERIMENT_DIR + h5_file + '_train-' + str(idx) + '-' + str(subset_index) + '.jpg')
                 # report
                 logger.info(classification_report(y_training_subset, y_training_prediction))
                 # top5 accuracy
@@ -369,7 +369,7 @@ if __name__ == "__main__":
                 fig = plot_confusion_matrix(confusion_matrix,
                                             classes_num[subset_index * classes_in_subset:
                                                         (subset_index + 1) * classes_in_subset])
-                plt.savefig(EXPERIMENT_DIR + h5_file + '_test-' + str(subset_index) + '.jpg')
+                plt.savefig(EXPERIMENT_DIR + h5_file + '_test-' + str(idx) + '-' + str(subset_index) + '.jpg')
                 # report
                 logger.info(classification_report(y_test_subset, y_testing_prediction))
                 # top5 accuracy
